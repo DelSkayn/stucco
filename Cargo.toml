@@ -1,0 +1,12 @@
+[package]
+name = "stucco"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = ["derive", "derive_impl"]
+
+
+[dependencies]
+stucco_derive = { version = "0.1.0", path = "derive" }
+
