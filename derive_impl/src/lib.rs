@@ -1,200 +1,353 @@
-use std::{
-    collections::HashMap,
-    path::Path,
-    sync::{mpsc, Arc},
-};
-
 use inkwell::{
+    attributes::Attribute,
     builder::Builder,
-    context::{self, Context},
-    llvm_sys::LLVMCallConv,
-    module::Module,
+    context::Context,
+    llvm_sys::{object, LLVMCallConv},
+    memory_buffer::MemoryBuffer,
+    module::{Linkage, Module},
     targets::{FileType, Target, TargetTriple},
-    types::{AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum},
-    values::{
-        AnyValue, AnyValueEnum, BasicMetadataValueEnum, BasicValue, BasicValueEnum, IntValue,
-    },
-    AddressSpace,
+    types::{AnyType as _, BasicType},
+    values::{AnyValue, BasicValue, FunctionValue},
+    AddressSpace, IntPredicate,
 };
-use proc_macro2::TokenStream;
-use syn::ItemFn;
+use proc_macro2::{Span, TokenStream};
+use quote::quote;
+use std::{cell::Cell, collections::HashMap, path::Path};
+use syn::{spanned::Spanned, Error, GenericParam, ItemFn, Result, ReturnType};
 
 #[cfg(not(target_arch = "x86_64"))]
 compile_error!("TARGET not supported");
+
+mod obj;
+mod value;
+use value::{Mutability, Signing, Symbol, Ty, Value};
 
 struct StencilModule<'ctx> {
     context: &'ctx Context,
     module: Module<'ctx>,
     builder: Builder<'ctx>,
-    symbols: HashMap<String, AnyValueEnum<'ctx>>,
-    count: usize,
+    symbols: HashMap<String, Symbol<'ctx>>,
+    function: Option<FunctionValue<'ctx>>,
+    count: Cell<usize>,
 }
 
-pub fn template(_attrs: TokenStream, input: TokenStream) -> TokenStream {
-    match unsafe { Context::get_global(|ctx| template_inner(ctx, input)) } {
+impl StencilModule<'_> {
+    pub fn next_name(&self, prefix: &str) -> String {
+        let res = format!("{}{}", prefix, self.count.get());
+        self.count.set(self.count.get() + 1);
+        res
+    }
+}
+
+fn path_to_ident(path: &syn::Path) -> Result<syn::Ident> {
+    if path.segments.is_empty() || path.segments.len() > 1 {
+        return Err(Error::new_spanned(path, "unsupported path"));
+    }
+
+    Ok(path.segments.first().unwrap().ident.clone())
+}
+
+pub fn template(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    match unsafe { Context::get_global(|ctx| template_inner(ctx, attrs, input)) } {
         Ok(x) => x,
         Err(e) => e.to_compile_error(),
     }
 }
 
-fn syn_type_to_llvm<'a>(ty: &syn::Type, ctx: &'a Context) -> BasicTypeEnum<'a> {
+fn syn_type_to_ty<'a>(ty: &syn::Type) -> Result<Ty> {
     match ty {
         syn::Type::Path(x) => {
             if x.qself.is_some() {
-                panic!("unsupported type");
+                return Err(Error::new_spanned(x, "unsupported type"));
             }
             if x.path.segments.len() > 1 {
-                panic!("unsupported type");
+                return Err(Error::new_spanned(x, "unsupported type"));
             }
-            let name = x.path.segments.first().unwrap();
 
-            if name.ident == "u64" {
-                return ctx.i64_type().into();
+            let name = path_to_ident(&x.path)?;
+
+            if name == "u64" {
+                return Ok(Ty::B64(Signing::Unsigned));
             }
-            if name.ident == "i64" {
-                return ctx.i64_type().into();
+
+            if name == "i64" {
+                return Ok(Ty::B64(Signing::Signed));
             }
-            panic!("unsupported type")
+
+            return Err(Error::new_spanned(x, "unsupported type"));
         }
-        syn::Type::Ptr(_) => ctx.ptr_type(AddressSpace::default()).into(),
-        _ => panic!("unsupported type"),
+        syn::Type::Ptr(x) => {
+            let inner = syn_type_to_ty(&x.elem)?;
+            return Ok(Ty::Ptr(Mutability::Mutable, Box::new(inner)));
+        }
+        syn::Type::BareFn(x) => {
+            let args = x.inputs.iter().map(|x| syn_type_to_ty(&x.ty)).try_fold(
+                Vec::new(),
+                |mut acc, ty| match ty {
+                    Ok(x) => {
+                        acc.push(x);
+                        Ok(acc)
+                    }
+                    Err(e) => Err(e),
+                },
+            )?;
+            let out = if let ReturnType::Type(_, ref ty) = x.output {
+                syn_type_to_ty(ty)?
+            } else {
+                Ty::Void
+            };
+
+            Ok(Ty::Fn(args, Box::new(out)))
+        }
+        _ => Err(Error::new_spanned(ty, "unsupported type")),
     }
 }
 
-fn value_to_int<'ctx>(i: AnyValueEnum<'ctx>, module: &mut StencilModule<'ctx>) -> IntValue<'ctx> {
-    if i.is_int_value() {
-        return i.into_int_value();
+fn compile_store_unary<'ctx>(
+    expr: &syn::ExprUnary,
+    value: Value<'ctx>,
+    span: Span,
+    module: &mut StencilModule<'ctx>,
+) -> Result<()> {
+    match expr.op {
+        syn::UnOp::Deref(_) => {
+            let v = compile_expr(&*expr.expr, module)?;
+            v.store(span, value, module)
+        }
+        _ => return Err(Error::new(expr.span(), "cannot assign to this expression")),
     }
+}
 
-    if i.is_pointer_value() {
-        let load = module
-            .builder
-            .build_load(
-                module.context.i64_type(),
-                i.into_pointer_value(),
-                &format!("load_ptr{}", module.count),
-            )
-            .unwrap();
-        module.count += 1;
-        return load.into_int_value();
+fn compile_store<'ctx>(
+    expr: &syn::Expr,
+    value: Value<'ctx>,
+    span: Span,
+    module: &mut StencilModule<'ctx>,
+) -> Result<()> {
+    match expr {
+        syn::Expr::Paren(x) => compile_store(&x.expr, value, span, module),
+        syn::Expr::Unary(x) => compile_store_unary(x, value, span, module),
+        _ => todo!(),
     }
-
-    todo!()
 }
 
 fn compile_macro<'ctx>(
     expr: &syn::ExprMacro,
     module: &mut StencilModule<'ctx>,
-) -> AnyValueEnum<'ctx> {
-    if expr.mac.path.segments.first().unwrap().ident == "next" {
+) -> Result<Value<'ctx>> {
+    let name = path_to_ident(&expr.mac.path)?;
+    if name == "next" {
         let call = expr.mac.parse_body::<syn::ExprCall>().unwrap();
         let name = match *call.func {
             syn::Expr::Path(x) => x.path.segments.first().unwrap().ident.to_string(),
             _ => panic!(),
         };
 
-        let args = call
-            .args
-            .iter()
-            .map(|x| compile_expr(x, module))
-            .collect::<Vec<_>>();
+        let args = call.args.iter().map(|x| compile_expr(x, module)).try_fold(
+            Vec::new(),
+            |mut acc, item| match item {
+                Ok(x) => {
+                    acc.push(x);
+                    Ok(acc)
+                }
+                Err(e) => Err(e),
+            },
+        )?;
 
-        let types = args
-            .iter()
-            .map(|x| BasicMetadataTypeEnum::try_from(x.get_type()).unwrap())
-            .collect::<Vec<_>>();
+        let types =
+            args.iter()
+                .map(|x| x.to_basic_meta_type())
+                .try_fold(Vec::new(), |mut acc, item| match item {
+                    Ok(x) => {
+                        acc.push(x);
+                        Ok(acc)
+                    }
+                    Err(e) => Err(e),
+                })?;
 
         let fn_type = module.context.void_type().fn_type(&types, false);
 
-        let args = args
-            .iter()
-            .map(|x| BasicMetadataValueEnum::try_from(x.clone()).unwrap())
-            .collect::<Vec<_>>();
+        let args = args.iter().map(|x| x.to_basic_meta_value()).try_fold(
+            Vec::new(),
+            |mut acc, item| match item {
+                Ok(x) => {
+                    acc.push(x);
+                    Ok(acc)
+                }
+                Err(e) => Err(e),
+            },
+        )?;
 
         let func = module
             .module
             .add_function(&format!("__become_{name}"), fn_type, None);
-        func.set_call_conventions(LLVMCallConv::LLVMCCallConv as u32);
+        func.set_call_conventions(LLVMCallConv::LLVMGHCCallConv as u32);
 
         let become_func = module
             .builder
             .build_call(func, &args, &format!("_call_{name}"))
             .unwrap();
+        become_func.set_call_convention(LLVMCallConv::LLVMGHCCallConv as u32);
         become_func.set_tail_call(true);
 
-        module.builder.build_return(None);
+        module.builder.build_return(None).unwrap();
 
-        return module.context.i8_type().const_zero().into();
+        return Ok(Value::void(expr.span()));
     }
-    todo!()
+    return Err(Error::new_spanned(expr, "unknown macro"));
 }
 
-fn compile_expr<'ctx>(expr: &syn::Expr, module: &mut StencilModule<'ctx>) -> AnyValueEnum<'ctx> {
+fn compile_expr<'ctx>(expr: &syn::Expr, module: &mut StencilModule<'ctx>) -> Result<Value<'ctx>> {
     match expr {
-        syn::Expr::Array(_) => todo!(),
-        syn::Expr::Assign(_) => todo!(),
-        syn::Expr::Async(_) => todo!(),
-        syn::Expr::Await(_) => todo!(),
         syn::Expr::Binary(ref x) => compile_binary_expr(x, module),
-        syn::Expr::Block(_) => todo!(),
-        syn::Expr::Break(_) => todo!(),
-        syn::Expr::Call(_) => todo!(),
-        syn::Expr::Cast(_) => todo!(),
-        syn::Expr::Closure(_) => todo!(),
-        syn::Expr::Const(_) => todo!(),
-        syn::Expr::Continue(_) => todo!(),
-        syn::Expr::Field(_) => todo!(),
-        syn::Expr::ForLoop(_) => todo!(),
-        syn::Expr::Group(_) => todo!(),
-        syn::Expr::If(_) => todo!(),
-        syn::Expr::Index(_) => todo!(),
-        syn::Expr::Infer(_) => todo!(),
-        syn::Expr::Let(_) => todo!(),
         syn::Expr::Lit(ref x) => compile_literal_expr(x, module),
-        syn::Expr::Loop(_) => todo!(),
-        syn::Expr::Macro(x) => compile_macro(x, module),
-        syn::Expr::Match(_) => todo!(),
-        syn::Expr::MethodCall(_) => todo!(),
-        syn::Expr::Paren(_) => todo!(),
-        syn::Expr::Path(pat) => {
-            let pat = dbg!(pat.path.segments.first().unwrap().ident.to_string());
-            dbg!(module.symbols.get(&pat)).unwrap().clone()
+        syn::Expr::Path(path) => {
+            let ident = path_to_ident(&path.path)?;
+            match module.symbols.get(&ident.to_string()) {
+                Some(Symbol::Local(x)) => {
+                    return Ok(x.clone());
+                }
+                Some(Symbol::Constant { ty, addr, .. }) => {
+                    let v = if ty.is_ptr() {
+                        let v = module
+                            .builder
+                            .build_load(
+                                module.context.i64_type(),
+                                *addr,
+                                &module.next_name("load_global_ptr"),
+                            )
+                            .unwrap()
+                            .into_int_value();
+
+                        /*
+                        v.as_instruction_value()
+                            .unwrap()
+                            .set_volatile(true)
+                            .unwrap();
+                        */
+
+                        module
+                            .builder
+                            .build_int_to_ptr(
+                                v,
+                                module.context.ptr_type(AddressSpace::default()),
+                                "int_to_ptr",
+                            )
+                            .unwrap()
+                            .into()
+                    } else {
+                        let Some(t) = ty.to_basic_type(module) else {
+                            return Err(Error::new_spanned(expr, "use of void constant"));
+                        };
+                        let t = t.into_int_type();
+                        module
+                            .builder
+                            .build_load(t, *addr, &module.next_name("load_global_ptr"))
+                            .unwrap()
+                            .into()
+                    };
+                    return Ok(Value::new(ty.clone(), v, expr.span()));
+                }
+                None => return Err(Error::new_spanned(ident, "undefined symbol")),
+            }
         }
-        syn::Expr::Range(_) => todo!(),
-        syn::Expr::Reference(_) => todo!(),
-        syn::Expr::Repeat(_) => todo!(),
-        syn::Expr::Return(_) => todo!(),
-        syn::Expr::Struct(_) => todo!(),
-        syn::Expr::Try(_) => todo!(),
-        syn::Expr::TryBlock(_) => todo!(),
-        syn::Expr::Tuple(_) => todo!(),
-        syn::Expr::Unary(_) => todo!(),
-        syn::Expr::Unsafe(_) => todo!(),
-        syn::Expr::Verbatim(_) => todo!(),
-        syn::Expr::While(_) => todo!(),
-        syn::Expr::Yield(_) => todo!(),
-        _ => todo!(),
+        syn::Expr::Macro(x) => compile_macro(x, module),
+        syn::Expr::Unary(x) => compile_unary_expr(x, module),
+        syn::Expr::Paren(x) => compile_expr(&x.expr, module),
+        syn::Expr::Assign(assign) => {
+            let right = compile_expr(&assign.right, module)?;
+            compile_store(&assign.left, right, assign.span(), module)?;
+            Ok(Value::void(assign.span()))
+        }
+        syn::Expr::Call(x) => {
+            let func = compile_expr(&x.func, module)?;
+
+            let values =
+                x.args.iter().try_fold(Vec::new(), |mut acc, item| {
+                    match compile_expr(item, module) {
+                        Ok(x) => {
+                            acc.push(x);
+                            Ok(acc)
+                        }
+                        Err(e) => Err(e),
+                    }
+                })?;
+
+            func.call(x.span(), values, module)
+        }
+        syn::Expr::If(x) => {
+            let branch = module.context.append_basic_block(
+                module.function.clone().unwrap(),
+                &module.next_name("branch"),
+            );
+            let merge = module
+                .context
+                .append_basic_block(module.function.clone().unwrap(), &module.next_name("merge"));
+
+            let expr = compile_expr(&x.cond, module)?;
+
+            if *expr.ty() != Ty::Bool {
+                return Err(Error::new(*expr.span(), "expected boolean expression"));
+            }
+
+            module
+                .builder
+                .build_conditional_branch(expr.value().unwrap().into_int_value(), branch, merge)
+                .unwrap();
+
+            module.builder.position_at_end(branch);
+
+            for s in x.then_branch.stmts.iter() {
+                compile_stmt(s, module)?;
+            }
+
+            module.builder.build_unconditional_branch(merge).unwrap();
+
+            module.builder.position_at_end(merge);
+
+            Ok(Value::void(x.span()))
+        }
+        syn::Expr::Return(x) => {
+            let v = x
+                .expr
+                .as_ref()
+                .map(|x| compile_expr(&x, module).and_then(|x| x.to_basic_value()))
+                .transpose()?;
+            module
+                .builder
+                .build_return(v.as_ref().map(|x| x as &dyn BasicValue))
+                .unwrap();
+            Ok(Value::void(x.span()))
+        }
+        x => Err(Error::new_spanned(x, "unsupported expression")),
     }
 }
 
 fn compile_literal_expr<'ctx>(
     expr: &syn::ExprLit,
     module: &mut StencilModule<'ctx>,
-) -> AnyValueEnum<'ctx> {
+) -> Result<Value<'ctx>> {
     match expr.lit {
-        syn::Lit::Str(_) => todo!(),
-        syn::Lit::ByteStr(_) => todo!(),
-        syn::Lit::CStr(_) => todo!(),
-        syn::Lit::Byte(_) => todo!(),
-        syn::Lit::Char(_) => todo!(),
-        syn::Lit::Int(ref x) => module
-            .context
-            .i64_type()
-            .const_int(x.base10_parse().unwrap(), false)
-            .into(),
-        syn::Lit::Float(_) => todo!(),
-        syn::Lit::Bool(_) => todo!(),
-        syn::Lit::Verbatim(_) => todo!(),
+        syn::Lit::Int(ref x) => {
+            let v: u64 = x.base10_parse()?;
+            let v = Value::from_u64(module, v, x.span());
+            Ok(v)
+        }
+        ref x => Err(Error::new_spanned(x, "unsupported literal")),
+    }
+}
+
+fn compile_unary_expr<'ctx>(
+    expr: &syn::ExprUnary,
+    module: &mut StencilModule<'ctx>,
+) -> Result<Value<'ctx>> {
+    match expr.op {
+        syn::UnOp::Deref(_) => {
+            let res = compile_expr(&*expr.expr, module)?;
+            res.deref(expr.span(), module)
+        }
+        syn::UnOp::Not(_) => todo!(),
+        syn::UnOp::Neg(_) => todo!(),
         _ => todo!(),
     }
 }
@@ -202,103 +355,134 @@ fn compile_literal_expr<'ctx>(
 fn compile_binary_expr<'ctx>(
     expr: &syn::ExprBinary,
     module: &mut StencilModule<'ctx>,
-) -> AnyValueEnum<'ctx> {
-    let left = compile_expr(&expr.left, module);
-    let right = compile_expr(&expr.right, module);
-
+) -> Result<Value<'ctx>> {
     match expr.op {
         syn::BinOp::Add(_) => {
-            let left = value_to_int(left, module);
-            let right = value_to_int(right, module);
-            let v = module
-                .builder
-                .build_int_add(left, right, &format!("add{}", module.count))
-                .unwrap();
-            module.count += 1;
-            return v.into();
+            let left = compile_expr(&expr.left, module)?;
+            let right = compile_expr(&expr.right, module)?;
+            left.add(right, expr.span(), module)
         }
         syn::BinOp::Sub(_) => {
-            let left = value_to_int(left, module);
-            let right = value_to_int(right, module);
-            let v = module
-                .builder
-                .build_int_sub(left, right, &format!("sub{}", module.count))
-                .unwrap();
-            module.count += 1;
-            return v.into();
+            let left = compile_expr(&expr.left, module)?;
+            let right = compile_expr(&expr.right, module)?;
+            left.sub(right, expr.span(), module)
         }
-        syn::BinOp::Mul(_) => todo!(),
-        syn::BinOp::Div(_) => todo!(),
-        syn::BinOp::Rem(_) => todo!(),
-        syn::BinOp::And(_) => todo!(),
-        syn::BinOp::Or(_) => todo!(),
-        syn::BinOp::BitXor(_) => todo!(),
-        syn::BinOp::BitAnd(_) => todo!(),
-        syn::BinOp::BitOr(_) => todo!(),
-        syn::BinOp::Shl(_) => todo!(),
-        syn::BinOp::Shr(_) => todo!(),
-        syn::BinOp::Eq(_) => todo!(),
-        syn::BinOp::Lt(_) => todo!(),
-        syn::BinOp::Le(_) => todo!(),
-        syn::BinOp::Ne(_) => todo!(),
-        syn::BinOp::Ge(_) => todo!(),
-        syn::BinOp::Gt(_) => todo!(),
-        syn::BinOp::AddAssign(_) => todo!(),
-        syn::BinOp::SubAssign(_) => todo!(),
-        syn::BinOp::MulAssign(_) => todo!(),
-        syn::BinOp::DivAssign(_) => todo!(),
-        syn::BinOp::RemAssign(_) => todo!(),
-        syn::BinOp::BitXorAssign(_) => todo!(),
-        syn::BinOp::BitAndAssign(_) => todo!(),
-        syn::BinOp::BitOrAssign(_) => todo!(),
-        syn::BinOp::ShlAssign(_) => todo!(),
-        syn::BinOp::ShrAssign(_) => todo!(),
-        _ => todo!(),
+        syn::BinOp::AddAssign(_) => {
+            let left = compile_expr(&expr.left, module)?;
+            let right = compile_expr(&expr.right, module)?;
+            let v = left.add(right, expr.span(), module)?;
+            compile_store(&expr.left, v, expr.span(), module)?;
+            Ok(Value::void(expr.span()))
+        }
+        syn::BinOp::SubAssign(_) => {
+            let left = compile_expr(&expr.left, module)?;
+            let right = compile_expr(&expr.right, module)?;
+            let v = left.sub(right, expr.span(), module)?;
+            compile_store(&expr.left, v, expr.span(), module)?;
+            Ok(Value::void(expr.span()))
+        }
+        syn::BinOp::Eq(_) => {
+            let left = compile_expr(&expr.left, module)?;
+            let right = compile_expr(&expr.right, module)?;
+            left.cmp(IntPredicate::EQ, right, expr.span(), module)
+        }
+        syn::BinOp::Ne(_) => {
+            let left = compile_expr(&expr.left, module)?;
+            let right = compile_expr(&expr.right, module)?;
+            left.cmp(IntPredicate::NE, right, expr.span(), module)
+        }
+        x => {
+            return Err(Error::new_spanned(x, "unsupported binary operator"));
+        }
     }
 }
 
-fn compile_local_stmt<'ctx>(stmt: &syn::Local, module: &mut StencilModule<'ctx>) {
+fn compile_local_stmt<'ctx>(stmt: &syn::Local, module: &mut StencilModule<'ctx>) -> Result<()> {
     let pat = match stmt.pat {
         syn::Pat::Ident(ref x) => x.ident.clone(),
         _ => panic!(),
     };
 
-    let Some(ref init) = stmt.init else { panic!() };
-    let v = compile_expr(&init.expr, module);
+    let Some(ref init) = stmt.init else {
+        return Err(Error::new_spanned(
+            stmt,
+            "binding without initializer is not supported",
+        ));
+    };
+    let v = compile_expr(&init.expr, module)?;
 
-    module.symbols.insert(pat.to_string(), v);
+    module.symbols.insert(pat.to_string(), Symbol::Local(v));
+
+    Ok(())
 }
 
-fn compile_stmt<'ctx>(stmt: &syn::Stmt, module: &mut StencilModule<'ctx>) {
+fn compile_stmt<'ctx>(stmt: &syn::Stmt, module: &mut StencilModule<'ctx>) -> Result<()> {
     match stmt {
         syn::Stmt::Local(x) => {
-            compile_local_stmt(x, module);
+            compile_local_stmt(x, module)?;
         }
         syn::Stmt::Item(_) => todo!(),
         syn::Stmt::Expr(x, _) => {
-            compile_expr(x, module);
+            compile_expr(x, module)?;
         }
         syn::Stmt::Macro(_) => {}
     }
+    Ok(())
 }
 
-fn template_inner(context: &Context, input: TokenStream) -> Result<TokenStream, syn::Error> {
+fn template_inner(
+    context: &Context,
+    attrs: TokenStream,
+    input: TokenStream,
+) -> Result<TokenStream> {
     let parsed = syn::parse2::<ItemFn>(input)?;
 
-    let name = parsed.sig.ident.to_string();
+    let name = parsed.sig.ident;
 
-    let module = context.create_module(&name);
+    let module = context.create_module(&name.to_string());
     let builder = context.create_builder();
+
+    let mut entry = false;
+
+    if !attrs.is_empty() {
+        let meta = syn::parse2::<syn::Meta>(attrs)?;
+
+        match meta {
+            syn::Meta::Path(x) => {
+                if x.segments
+                    .first()
+                    .map(|x| x.ident == "entry")
+                    .unwrap_or(false)
+                {
+                    entry = true;
+                }
+            }
+            _ => {}
+        }
+    }
 
     let mut module = StencilModule {
         module,
         builder,
         context,
         symbols: HashMap::new(),
-        count: 0,
+        count: Cell::new(0),
+        function: None,
     };
 
-    let i64_type = context.i64_type();
+    /*
+    module.module.add_basic_value_flag(
+        "direct-access-external-data",
+        FlagBehavior::Override,
+        module.context.i32_type().const_int(1, false),
+    );
+
+    module.module.add_basic_value_flag(
+        "PIC Level",
+        FlagBehavior::Override,
+        module.context.bool_type().const_zero(),
+    );
+    */
 
     let args = parsed.sig.inputs.iter().map(|x| {
         let pat = match x {
@@ -307,46 +491,186 @@ fn template_inner(context: &Context, input: TokenStream) -> Result<TokenStream, 
         };
 
         let name = match *pat.pat {
-            syn::Pat::Ident(ref x) => x.ident.to_string(),
+            syn::Pat::Ident(ref x) => x.ident.clone(),
             _ => panic!("argument binding patterns other then a plain name are not allowed on a template function")
         };
 
-        let ty = syn_type_to_llvm(&pat.ty, context);
+        match syn_type_to_ty(&pat.ty) {
+            Ok(ty) => {
+                Ok((name,ty))
+            }
+            Err(e) => Err(e)
+        }
 
-        (name,ty)
-    }).collect::<Vec<_>>();
+    }).try_fold(Vec::new(), |mut acc, item| match item {
+        Ok(x) => {
+            acc.push(x);
+            Ok(acc)
+        },
+        Err(e) => Err(e)
+    })?;
 
     let args_ty: Vec<_> = args
         .iter()
-        .map(|x| BasicMetadataTypeEnum::from(x.1.clone()))
+        .map(|x| x.1.to_basic_meta_type(&mut module).unwrap())
         .collect();
 
     let func_type = match parsed.sig.output {
         syn::ReturnType::Default => context.void_type().fn_type(&args_ty, false),
-        syn::ReturnType::Type(_, ref ty) => syn_type_to_llvm(ty, context).fn_type(&args_ty, false),
+        syn::ReturnType::Type(_, ref ty) => {
+            let ty = syn_type_to_ty(ty)?.to_basic_type(&mut module).unwrap();
+            ty.fn_type(&args_ty, false)
+        }
     };
 
     let function = module.module.add_function("__stencil__", func_type, None);
-    function.set_call_conventions(LLVMCallConv::LLVMGHCCallConv as u32);
+    if entry {
+        function.set_call_conventions(LLVMCallConv::LLVMFastCallConv as u32);
+    } else {
+        function.set_call_conventions(LLVMCallConv::LLVMGHCCallConv as u32);
+    }
+
+    module.function = Some(function.clone());
 
     let bb = context.append_basic_block(function, "entry");
     module.builder.position_at_end(bb);
 
     for (idx, arg) in args.iter().enumerate() {
+        let existing = module
+            .symbols
+            .insert(
+                arg.0.to_string(),
+                Symbol::Local(Value::new(
+                    arg.1.clone(),
+                    function
+                        .get_nth_param(idx as u32)
+                        .unwrap()
+                        .as_any_value_enum(),
+                    arg.0.span(),
+                )),
+            )
+            .is_some();
+
+        if existing {
+            return Err(Error::new_spanned(arg.0.clone(), "duplicate argument"));
+        }
+    }
+
+    let union = module
+        .context
+        .struct_type(&[module.context.ptr_type(Default::default()).into()], false);
+
+    for p in parsed.sig.generics.params {
+        let GenericParam::Const(c) = p else {
+            return Err(Error::new_spanned(p, "only constant generics are allowed"));
+        };
+
+        let ty = syn_type_to_ty(&c.ty)?;
+
+        let global_v = module.module.add_global(
+            module.context.i8_type(),
+            None,
+            &format!("__patch_global__{}", c.ident),
+        );
+
+        global_v.set_linkage(Linkage::External);
+
+        let v = module
+            .builder
+            .build_alloca(union, &c.ident.to_string())
+            .unwrap();
+
+        module
+            .builder
+            .build_store(v, global_v.as_pointer_value())
+            .unwrap();
+
+        let ptr_ty = module.context.ptr_type(AddressSpace::default());
+        let asm_fn_ty = module.context.void_type().fn_type(&[ptr_ty.into()], false);
+
+        let asm = module.context.create_inline_asm(
+            asm_fn_ty,
+            String::new(),
+            "*m".to_string(),
+            true,
+            false,
+            None,
+            false,
+        );
+
+        let call = module
+            .builder
+            .build_indirect_call(asm_fn_ty, asm, &[v.into()], &module.next_name("clobber"))
+            .unwrap();
+
+        let id = Attribute::get_named_enum_kind_id("elementtype");
+        assert_ne!(id, 0);
+        let attr = module.context.create_type_attribute(
+            id,
+            module
+                .context
+                .ptr_type(Default::default())
+                .as_any_type_enum(),
+        );
+        call.add_attribute(inkwell::attributes::AttributeLoc::Param(0), attr);
+
         module.symbols.insert(
-            dbg!(arg.0.clone()),
-            function
-                .get_nth_param(idx as u32)
-                .unwrap()
-                .as_any_value_enum(),
+            c.ident.to_string(),
+            Symbol::Constant {
+                ty,
+                addr: v,
+                span: c.span(),
+            },
         );
     }
 
     for stmt in parsed.block.stmts.iter() {
-        compile_stmt(stmt, &mut module);
+        compile_stmt(stmt, &mut module)?;
     }
 
-    module.module.print_to_stderr();
+    let str = module.module.to_string();
+    let mut patched = String::new();
+
+    let out = env!("STUCCO_OUT_DIR");
+    println!("dumping to {out}");
+
+    // A hack to set options which are not supported by llvm-c
+    for l in str.lines() {
+        if !l.starts_with("@__patch_global__") {
+            patched.push_str(l);
+            patched.push('\n');
+            continue;
+        }
+
+        let Some(idx) = l.find("external global") else {
+            patched.push_str(l);
+            patched.push('\n');
+            continue;
+        };
+
+        let mut str = l.to_string();
+        str.insert_str(idx + "external".len(), " dso_local");
+        patched.push_str(&str);
+        patched.push('\n');
+    }
+
+    std::fs::write(
+        Path::new(&out).join(format!("{name}.ll")),
+        patched.trim().as_bytes(),
+    )
+    .unwrap();
+
+    let buffer =
+        MemoryBuffer::create_from_memory_range_copy(patched.trim().as_bytes(), "__stucco__source");
+    module.module = module
+        .context
+        .create_module_from_ir(buffer)
+        .inspect_err(|_| {
+            for (idx, l) in patched.lines().enumerate() {
+                println!("{idx:>2}:{}", l);
+            }
+        })
+        .expect("failed to parse IR");
 
     module.module.verify().unwrap();
 
@@ -365,8 +689,8 @@ fn template_inner(context: &Context, input: TokenStream) -> Result<TokenStream, 
             "generic",
             "",
             inkwell::OptimizationLevel::Aggressive,
-            inkwell::targets::RelocMode::PIC,
-            inkwell::targets::CodeModel::Default,
+            inkwell::targets::RelocMode::Static,
+            inkwell::targets::CodeModel::Medium,
         )
         .unwrap();
 
@@ -378,45 +702,67 @@ fn template_inner(context: &Context, input: TokenStream) -> Result<TokenStream, 
     let buffer = machine
         .write_to_memory_buffer(&module.module, FileType::Object)
         .unwrap();
-    let data = buffer.as_slice().to_vec();
 
-    for (k, v) in std::env::vars() {
-        println!("{} = {}", k, v);
-    }
+    std::fs::write(Path::new(&out).join(format!("{name}.o")), buffer.as_slice()).unwrap();
 
-    let path = Path::new(env!("STUCCO_OUT_DIR"));
+    let patches = obj::extract_patches(buffer.as_slice());
 
-    let out_dir = path.join("stucco");
+    let bytes = patches.text.iter().map(|x| {
+        quote! { #x }
+    });
 
-    let _ = std::fs::create_dir(&out_dir);
-
-    let file_path = out_dir.join(format!("{name}.o"));
-    dbg!(&file_path);
-
-    std::fs::write(file_path, &data).unwrap();
-
-    let object_file = buffer.create_object_file().unwrap();
-
-    for sec in object_file.get_sections() {
-        if sec.get_name() != Some(c".text") {
-            continue;
+    let jumps = patches.jumps.iter().map(|(name, v)| {
+        let offset = v.offset;
+        let size = v.target_size;
+        let addend = v.addend;
+        quote! {
+            ::stucco::TemplateJump::__create(#name,&[::stucco::Ty::U64],#offset,#addend,#size)
         }
+    });
 
-        for sym in object_file.get_symbols() {
-            if sym.get_name() != Some(c"__stencil__") {
-                continue;
-            }
-            let addr = sym.get_address() as usize;
-            println!("OFFSET: {:0<2x}", addr);
-            let end = addr + sym.size() as usize;
-            let bytes = &sec.get_contents()[addr..end];
-            print!("BYTES: ");
-            for b in bytes {
-                print!("{:0<2x} ", b)
-            }
-            println!()
+    let globals = patches.immediates.iter().map(|(name, v)| {
+        let offset = v.offset;
+        let size = v.target_size;
+        quote! {
+            ::stucco::TemplateConstant::__create(#name,::stucco::Ty::U64,#offset,#size)
         }
-    }
+    });
 
-    Ok(TokenStream::new())
+    let res = if entry {
+        quote! {
+            #[allow(non_camel_case_types)]
+            struct #name;
+
+            impl ::stucco::EntryTemplate<()> for #name{
+                const BYTES: &[u8] = &[
+                    #(#bytes,)*
+                ];
+                const CONSTANTS: &[::stucco::TemplateConstant] = &[
+                    #(#globals,)*
+                ];
+                const JUMPS: &[::stucco::TemplateJump] = &[
+                    #(#jumps,)*
+                ];
+            }
+        }
+    } else {
+        quote! {
+            #[allow(non_camel_case_types)]
+            struct #name;
+
+            impl ::stucco::Template<()> for #name{
+                const BYTES: &[u8] = &[
+                    #(#bytes,)*
+                ];
+                const CONSTANTS: &[::stucco::TemplateConstant] = &[
+                    #(#globals,)*
+                ];
+                const JUMPS: &[::stucco::TemplateJump] = &[
+                    #(#jumps,)*
+                ];
+            }
+        }
+    };
+
+    Ok(res)
 }
