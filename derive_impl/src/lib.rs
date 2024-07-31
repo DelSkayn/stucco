@@ -632,7 +632,6 @@ fn template_inner(
     let mut patched = String::new();
 
     let out = env!("STUCCO_OUT_DIR");
-    println!("dumping to {out}");
 
     // A hack to set options which are not supported by llvm-c
     for l in str.lines() {

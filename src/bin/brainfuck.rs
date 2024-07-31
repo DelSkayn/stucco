@@ -36,6 +36,18 @@ fn decrement(stack: *mut u64) {
 }
 
 #[stucco::template]
+fn next_constant<const C: u64>(stack: *mut u64) {
+    let stack = stack + C;
+    next!(next(stack))
+}
+
+#[stucco::template]
+fn previous_constant<const C: u64>(stack: *mut u64) {
+    let stack = stack - C;
+    next!(next(stack))
+}
+
+#[stucco::template]
 fn put<const F: fn(u64)>(stack: *mut u64) {
     F(*stack);
     next!(next(stack))
@@ -119,22 +131,62 @@ fn main() -> Result<(), Box<dyn StdError>> {
     while let Some(c) = chars.next() {
         match c {
             '>' => {
-                let n = builder.push::<next>(&[]);
+                let mut count = 1;
+                while let Some('>') = chars.peek() {
+                    chars.next();
+                    count += 1;
+                }
+
+                let n = if count > 1 {
+                    builder.push::<next_constant>(&[count])
+                } else {
+                    builder.push::<next>(&[])
+                };
                 builder.jump_to("next", prev, n);
                 prev = n;
             }
             '<' => {
-                let n = builder.push::<previous>(&[]);
+                let mut count = 1;
+                while let Some('<') = chars.peek() {
+                    chars.next();
+                    count += 1;
+                }
+
+                let n = if count > 1 {
+                    builder.push::<previous_constant>(&[count])
+                } else {
+                    builder.push::<previous>(&[])
+                };
                 builder.jump_to("next", prev, n);
                 prev = n;
             }
             '+' => {
-                let n = builder.push::<increment>(&[]);
+                let mut count = 1;
+                while let Some('+') = chars.peek() {
+                    chars.next();
+                    count += 1;
+                }
+
+                let n = if count > 1 {
+                    builder.push::<add_constant>(&[count])
+                } else {
+                    builder.push::<increment>(&[])
+                };
                 builder.jump_to("next", prev, n);
                 prev = n;
             }
             '-' => {
-                let n = builder.push::<decrement>(&[]);
+                let mut count = 1;
+                while let Some('-') = chars.peek() {
+                    chars.next();
+                    count += 1;
+                }
+
+                let n = if count > 1 {
+                    builder.push::<sub_constant>(&[count])
+                } else {
+                    builder.push::<decrement>(&[])
+                };
                 builder.jump_to("next", prev, n);
                 prev = n;
             }

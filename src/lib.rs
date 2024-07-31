@@ -113,7 +113,6 @@ impl FuncInstructions {
 }
 
 fn patch_slice(tgt: &mut [u8], offset: usize, s: &[u8]) {
-    println!("Patching at {:x}", offset);
     tgt[offset..(offset + s.len())].copy_from_slice(s)
 }
 
@@ -280,6 +279,7 @@ impl<Fn> Builder<Fn> {
             self.write_pending(p, &mut buffer, &mut pending);
         }
 
+        /*
         for (idx, p) in self.tree.iter().enumerate() {
             print!("{} @ {:0>2x} = ", idx, p.offset.unwrap());
             for p in p.text {
@@ -295,6 +295,7 @@ impl<Fn> Builder<Fn> {
             }
             println!()
         }
+        */
 
         self.patch_jumps(PartId(0), &mut buffer, &mut pending);
         while let Some(p) = pending.pop_front() {
