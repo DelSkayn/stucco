@@ -116,18 +116,13 @@ impl fmt::Display for Error {
 
 impl StdError for Error {}
 
-fn main() -> Result<(), Box<dyn StdError>> {
-    let text = if let Some(x) = std::env::args().skip(1).next() {
-        std::fs::read_to_string(x)?
-    } else {
-        std::io::read_to_string(std::io::stdin())?
-    };
-
+fn run_brainfuck(source: &str) -> Result<(), Box<dyn StdError>> {
     let mut builder = stucco::Builder::<()>::new();
 
     let mut prev = builder.start::<enter>(&[]);
     let mut jumps = Vec::new();
-    let mut chars = text.chars().peekable();
+    let mut chars = source.chars().peekable();
+
     while let Some(c) = chars.next() {
         match c {
             '>' => {
@@ -230,9 +225,6 @@ fn main() -> Result<(), Box<dyn StdError>> {
 
     let code = builder.finish();
 
-    let mut f = std::fs::File::create("brainfuck.o")?;
-    f.write_all(&code.dump_to_obj())?;
-
     let func_ptr = unsafe { JitFunction::<()>::from_instructions(&code).unwrap() };
 
     let mut stack = vec![0u64; 1024 * 1024 * 1024];
@@ -251,4 +243,24 @@ fn main() -> Result<(), Box<dyn StdError>> {
     println!();
 
     Ok(())
+}
+
+fn main() -> Result<(), Box<dyn StdError>> {
+    let text = if let Some(x) = std::env::args().skip(1).next() {
+        std::fs::read_to_string(x)?
+    } else {
+        std::io::read_to_string(std::io::stdin())?
+    };
+    run_brainfuck(&text)
+}
+
+#[cfg(test)]
+mod test {
+    use super::run_brainfuck;
+
+    #[test]
+    fn run_mandelbrot() {
+        let src = include_str!("../../test/mandelbrot.bf");
+        run_brainfuck(src).unwrap()
+    }
 }
