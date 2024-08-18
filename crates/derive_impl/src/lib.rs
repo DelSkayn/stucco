@@ -18,6 +18,7 @@ use syn::{spanned::Spanned, Error, GenericParam, ItemFn, Result, ReturnType};
 #[cfg(not(target_arch = "x86_64"))]
 compile_error!("TARGET not supported");
 
+mod ast;
 mod obj;
 mod value;
 use value::{Mutability, Signing, Symbol, Ty, Value};

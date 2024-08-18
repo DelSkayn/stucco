@@ -1,0 +1,16 @@
+[package]
+name = "stucco-parser"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+span-locations = ["ast/span-locations"]
+default = ["span-locations"]
+
+[dependencies]
+ast = { package = "stucco-ast", version = "0.1.0", path = "../ast", default-features=false }
+proc-macro2 = "1.0.86"
+syn = { version = "2.0.72", default-features = false, features = ["parsing","printing"] }
+
+[dev-dependencies]
+ast = { package = "stucco-ast", version = "0.1.0", path = "../ast", default-features=false, features = ["print"] }

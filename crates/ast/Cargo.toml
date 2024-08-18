@@ -1,0 +1,14 @@
+[package]
+name = "stucco-ast"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+print = ["syn/extra-traits"]
+span-locations = ["proc-macro2/span-locations"]
+default = ["print"]
+
+[dependencies]
+bytemuck = { version = "1.16.3", features = ["derive"] }
+proc-macro2 = "1.0.86"
+syn = { version = "2.0.72", default-features = false }

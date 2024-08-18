@@ -116,7 +116,7 @@ impl fmt::Display for Error {
 
 impl StdError for Error {}
 
-fn run_brainfuck(source: &str) -> Result<(), Box<dyn StdError>> {
+fn run_brainfuck(source: &str, dump_obj: bool) -> Result<(), Box<dyn StdError>> {
     let mut builder = stucco::Builder::<()>::new();
 
     let mut prev = builder.start::<enter>(&[]);
@@ -225,6 +225,10 @@ fn run_brainfuck(source: &str) -> Result<(), Box<dyn StdError>> {
 
     let code = builder.finish();
 
+    if dump_obj {
+        std::fs::write("out.o", &code.dump_to_obj()).unwrap()
+    }
+
     let func_ptr = unsafe { JitFunction::<()>::from_instructions(&code).unwrap() };
 
     let mut stack = vec![0u64; 1024 * 1024 * 1024];
@@ -246,12 +250,27 @@ fn run_brainfuck(source: &str) -> Result<(), Box<dyn StdError>> {
 }
 
 fn main() -> Result<(), Box<dyn StdError>> {
-    let text = if let Some(x) = std::env::args().skip(1).next() {
+    let mut file = None;
+    let mut dump = false;
+    let iter = std::env::args().skip(1);
+    for a in iter {
+        if a == "--dump-obj" {
+            dump = true;
+            continue;
+        }
+        if a.starts_with('-') {
+            println!("invalid argument '{}'", a);
+            return Ok(());
+        }
+        file = Some(a.to_owned());
+    }
+
+    let text = if let Some(x) = file {
         std::fs::read_to_string(x)?
     } else {
         std::io::read_to_string(std::io::stdin())?
     };
-    run_brainfuck(&text)
+    run_brainfuck(&text, dump)
 }
 
 #[cfg(test)]
