@@ -10,7 +10,7 @@ use std::{
 
 #[cfg(feature = "print")]
 mod print;
-use common::id;
+use common::{id, id::Id};
 #[cfg(feature = "print")]
 pub use print::{AstDisplay, AstFormatter, AstRender};
 
@@ -37,7 +37,6 @@ impl<T> NodeId<T> {
 pub struct NodeListId<T> {
     id: NodeId<NodeList<T>>,
 }
-
 impl<T> Clone for NodeListId<T> {
     fn clone(&self) -> Self {
         *self
@@ -61,6 +60,18 @@ impl<T> fmt::Debug for NodeListId<T> {
         f.debug_struct("NodeListId")
             .field("id", &self.id.into_u32())
             .finish()
+    }
+}
+
+impl<T> Id for NodeListId<T> {
+    fn idx(self) -> usize {
+        self.id.idx()
+    }
+
+    fn from_idx(idx: usize) -> Option<Self> {
+        Some(Self {
+            id: NodeId::from_idx(idx)?,
+        })
     }
 }
 

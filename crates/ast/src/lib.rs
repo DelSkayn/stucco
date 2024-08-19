@@ -204,6 +204,7 @@ ast_struct! {
 ast_struct! {
     pub struct Let {
         pub name: NodeId<Ident>,
+        pub mutable: bool,
         pub expr: NodeId<Expr>,
     }
 }

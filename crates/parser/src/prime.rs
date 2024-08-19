@@ -110,10 +110,24 @@ impl Parse for ast::Tail {
 impl Parse for ast::Let {
     fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
         let span = parser.parse_syn::<Token![let]>()?.span();
+
+        let mutable = if parser.peek(Token![mut]) {
+            parser.parse_syn::<Token![mut]>()?;
+            true
+        } else {
+            false
+        };
+
         let name = parser.parse_syn_push()?;
         parser.parse_syn::<Token![=]>()?;
         let expr = parser.parse()?;
-        parser.push(Self { name, expr, span })
+
+        parser.push(Self {
+            name,
+            mutable,
+            expr,
+            span,
+        })
     }
 }
 

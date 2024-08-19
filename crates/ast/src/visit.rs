@@ -129,7 +129,7 @@ pub trait Visit: Sized {
     }
 }
 
-fn visit_module<V>(visit: &mut V, ast: &Ast, m: NodeId<Module>) -> Result<(), V::Error>
+pub fn visit_module<V>(visit: &mut V, ast: &Ast, m: NodeId<Module>) -> Result<(), V::Error>
 where
     V: Visit,
 {
@@ -140,7 +140,7 @@ where
     Ok(())
 }
 
-fn visit_stencil_function<V>(
+pub fn visit_stencil_function<V>(
     visit: &mut V,
     ast: &Ast,
     m: NodeId<StencilFunction>,
@@ -172,7 +172,7 @@ where
     Ok(())
 }
 
-fn visit_variant<V>(visit: &mut V, ast: &Ast, m: NodeId<Variant>) -> Result<(), V::Error>
+pub fn visit_variant<V>(visit: &mut V, ast: &Ast, m: NodeId<Variant>) -> Result<(), V::Error>
 where
     V: Visit,
 {
@@ -181,7 +181,7 @@ where
     }
 }
 
-fn visit_variant_constant<V>(
+pub fn visit_variant_constant<V>(
     visit: &mut V,
     ast: &Ast,
     m: NodeId<VariantConstant>,
@@ -195,7 +195,7 @@ where
     Ok(())
 }
 
-fn visit_parameter<V>(visit: &mut V, ast: &Ast, m: NodeId<Parameter>) -> Result<(), V::Error>
+pub fn visit_parameter<V>(visit: &mut V, ast: &Ast, m: NodeId<Parameter>) -> Result<(), V::Error>
 where
     V: Visit,
 {
@@ -205,7 +205,7 @@ where
     Ok(())
 }
 
-fn visit_expr<V>(visit: &mut V, ast: &Ast, e: NodeId<Expr>) -> Result<(), V::Error>
+pub fn visit_expr<V>(visit: &mut V, ast: &Ast, e: NodeId<Expr>) -> Result<(), V::Error>
 where
     V: Visit,
 {
@@ -232,14 +232,14 @@ where
     }
 }
 
-fn visit_block<V>(visit: &mut V, ast: &Ast, b: NodeId<Block>) -> Result<(), V::Error>
+pub fn visit_block<V>(visit: &mut V, ast: &Ast, b: NodeId<Block>) -> Result<(), V::Error>
 where
     V: Visit,
 {
     visit.visit_inner_block(ast, ast[b].body)
 }
 
-fn visit_inner_block<V>(
+pub fn visit_inner_block<V>(
     visit: &mut V,
     ast: &Ast,
     mut b: Option<NodeListId<Expr>>,
@@ -254,7 +254,7 @@ where
     Ok(())
 }
 
-fn visit_if<V>(visit: &mut V, ast: &Ast, e: NodeId<If>) -> Result<(), V::Error>
+pub fn visit_if<V>(visit: &mut V, ast: &Ast, e: NodeId<If>) -> Result<(), V::Error>
 where
     V: Visit,
 {
@@ -267,14 +267,14 @@ where
     Ok(())
 }
 
-fn visit_loop<V>(visit: &mut V, ast: &Ast, e: NodeId<Block>) -> Result<(), V::Error>
+pub fn visit_loop<V>(visit: &mut V, ast: &Ast, e: NodeId<Block>) -> Result<(), V::Error>
 where
     V: Visit,
 {
     visit.visit_block(ast, e)
 }
 
-fn visit_while<V>(visit: &mut V, ast: &Ast, e: NodeId<While>) -> Result<(), V::Error>
+pub fn visit_while<V>(visit: &mut V, ast: &Ast, e: NodeId<While>) -> Result<(), V::Error>
 where
     V: Visit,
 {
@@ -283,7 +283,7 @@ where
     Ok(())
 }
 
-fn visit_return<V>(visit: &mut V, ast: &Ast, e: NodeId<Return>) -> Result<(), V::Error>
+pub fn visit_return<V>(visit: &mut V, ast: &Ast, e: NodeId<Return>) -> Result<(), V::Error>
 where
     V: Visit,
 {
@@ -293,11 +293,11 @@ where
     Ok(())
 }
 
-fn visit_tail<V>(visit: &mut V, ast: &Ast, e: NodeId<Tail>) -> Result<(), V::Error>
+pub fn visit_tail<V>(visit: &mut V, ast: &Ast, e: NodeId<Tail>) -> Result<(), V::Error>
 where
     V: Visit,
 {
-    visit.visit_ident(ast, ast[e].callee);
+    visit.visit_ident(ast, ast[e].callee)?;
 
     let mut cur = ast[e].args;
     while let Some(x) = ast.next_list(&mut cur) {
@@ -306,7 +306,7 @@ where
     Ok(())
 }
 
-fn visit_break<V>(visit: &mut V, ast: &Ast, e: NodeId<Break>) -> Result<(), V::Error>
+pub fn visit_break<V>(visit: &mut V, ast: &Ast, e: NodeId<Break>) -> Result<(), V::Error>
 where
     V: Visit,
 {
@@ -316,7 +316,7 @@ where
     Ok(())
 }
 
-fn visit_let<V>(visit: &mut V, ast: &Ast, e: NodeId<Let>) -> Result<(), V::Error>
+pub fn visit_let<V>(visit: &mut V, ast: &Ast, e: NodeId<Let>) -> Result<(), V::Error>
 where
     V: Visit,
 {
@@ -325,7 +325,7 @@ where
     Ok(())
 }
 
-fn visit_cast<V>(visit: &mut V, ast: &Ast, e: NodeId<Cast>) -> Result<(), V::Error>
+pub fn visit_cast<V>(visit: &mut V, ast: &Ast, e: NodeId<Cast>) -> Result<(), V::Error>
 where
     V: Visit,
 {
@@ -334,7 +334,7 @@ where
     Ok(())
 }
 
-fn visit_binary<V>(visit: &mut V, ast: &Ast, e: NodeId<BinaryExpr>) -> Result<(), V::Error>
+pub fn visit_binary<V>(visit: &mut V, ast: &Ast, e: NodeId<BinaryExpr>) -> Result<(), V::Error>
 where
     V: Visit,
 {
@@ -343,7 +343,7 @@ where
     Ok(())
 }
 
-fn visit_unary<V>(visit: &mut V, ast: &Ast, e: NodeId<UnaryExpr>) -> Result<(), V::Error>
+pub fn visit_unary<V>(visit: &mut V, ast: &Ast, e: NodeId<UnaryExpr>) -> Result<(), V::Error>
 where
     V: Visit,
 {
@@ -351,7 +351,7 @@ where
     Ok(())
 }
 
-fn visit_field<V>(visit: &mut V, ast: &Ast, e: NodeId<Field>) -> Result<(), V::Error>
+pub fn visit_field<V>(visit: &mut V, ast: &Ast, e: NodeId<Field>) -> Result<(), V::Error>
 where
     V: Visit,
 {
@@ -360,7 +360,7 @@ where
     Ok(())
 }
 
-fn visit_index<V>(visit: &mut V, ast: &Ast, e: NodeId<Index>) -> Result<(), V::Error>
+pub fn visit_index<V>(visit: &mut V, ast: &Ast, e: NodeId<Index>) -> Result<(), V::Error>
 where
     V: Visit,
 {
@@ -369,7 +369,7 @@ where
     Ok(())
 }
 
-fn visit_call<V>(visit: &mut V, ast: &Ast, e: NodeId<Call>) -> Result<(), V::Error>
+pub fn visit_call<V>(visit: &mut V, ast: &Ast, e: NodeId<Call>) -> Result<(), V::Error>
 where
     V: Visit,
 {
@@ -383,7 +383,7 @@ where
     Ok(())
 }
 
-fn visit_method<V>(visit: &mut V, ast: &Ast, e: NodeId<Method>) -> Result<(), V::Error>
+pub fn visit_method<V>(visit: &mut V, ast: &Ast, e: NodeId<Method>) -> Result<(), V::Error>
 where
     V: Visit,
 {

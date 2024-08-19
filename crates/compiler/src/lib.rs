@@ -1,15 +1,14 @@
-use ast::{PushNodeError, Span};
+use ast::{Ast, NodeId, Span};
 
 pub mod resolve;
 
 #[derive(Debug)]
 pub enum Error {
     UndeclaredSymbol(Span),
-    PushNode(PushNodeError),
+    PushNode,
 }
 
-impl From<PushNodeError> for Error {
-    fn from(v: PushNodeError) -> Self {
-        Self::PushNode(v)
-    }
+pub fn compile(ast: Ast, root: NodeId<ast::Module>) -> Result<(), Error> {
+    let _symbols = resolve::resolve(root, &ast)?;
+    todo!()
 }
