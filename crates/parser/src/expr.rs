@@ -1,5 +1,5 @@
 use ast::{BinOp, NodeId, Spanned as _, UnOp};
-use syn::{Result, Token};
+use syn::{token, Result, Token};
 
 use crate::{prime::parse_prime, Parse, Parser};
 
@@ -36,39 +36,51 @@ macro_rules! parse_bin_op {
         })*
     }) => {
         {
-            $(
-                if $i <= $bp {
-                    $(
-                        if $parser.peek(Token![$t]){
-                            let span = $parser.parse_syn::<Token![$t]>()?.span();
-                            let right = parse_binding($parser, $bp)?;
-                            let new_expr = $parser.push(ast::BinaryExpr{
-                                left: $bind,
-                                op: $op,
-                                right,
-                                span,
-                            })?;
-                            $bind = $parser.push(ast::Expr::Binary(new_expr))?;
-                            continue
-
-                        }
-                    )*
+            $($(
+                if $parser.peek(Token![$t]){
+                    if $bp < $i {
+                        break
+                    }
+                    let span = $parser.parse_syn::<Token![$t]>()?.span();
+                    let right = parse_binding($parser, $bp)?;
+                    let new_expr = $parser.push(ast::BinaryExpr{
+                        left: $bind,
+                        op: $op,
+                        right,
+                        span,
+                    })?;
+                    $bind = $parser.push(ast::Expr::Binary(new_expr))?;
+                    continue
                 }
-            )*
+            )*)*
         }
     };
 }
 
 fn parse_binding(parser: &mut Parser, bp: BindingPower) -> Result<NodeId<ast::Expr>> {
-    let mut expr = if bp <= BindingPower::Unary {
+    let mut lhs = if bp <= BindingPower::Unary {
         parse_unary(parser)?
     } else {
         parse_prime(parser)?
     };
 
     loop {
+        if parser.peek(token::Paren) {
+            if BindingPower::CallIndex < bp {
+                break;
+            }
+            lhs = parse_call(parser, lhs)?;
+            continue;
+        }
+
         parse_bin_op! {
-            expr,parser,bp {
+            lhs,parser,bp {
+                BindingPower::Cmp => {
+                    Token![<=] =>  BinOp::Le,
+                    Token![>=] =>  BinOp::Ge,
+                    Token![==] =>  BinOp::Eq,
+                    Token![!=] =>  BinOp::Ne,
+                }
                 BindingPower::Assign => {
                     Token![=] => BinOp::Assign,
                     Token![+=] => BinOp::AddAssign,
@@ -88,14 +100,6 @@ fn parse_binding(parser: &mut Parser, bp: BindingPower) -> Result<NodeId<ast::Ex
                  BindingPower::And => {
                     Token![&&] => BinOp::And,
                 }
-                 BindingPower::Cmp => {
-                     Token![<] =>  BinOp::Lt,
-                     Token![<=] =>  BinOp::Le,
-                     Token![>=] =>  BinOp::Ge,
-                     Token![>] =>  BinOp::Gt,
-                     Token![==] =>  BinOp::Eq,
-                     Token![!=] =>  BinOp::Ne,
-                 }
                  BindingPower::BitOr => {
                     Token![|] => BinOp::BitOr,
                  }
@@ -108,6 +112,10 @@ fn parse_binding(parser: &mut Parser, bp: BindingPower) -> Result<NodeId<ast::Ex
                  BindingPower::Shift => {
                     Token![<<] => BinOp::Shl,
                     Token![>>] => BinOp::Shr,
+                 }
+                 BindingPower::Cmp => {
+                    Token![<] =>  BinOp::Lt,
+                    Token![>] =>  BinOp::Gt,
                  }
                  BindingPower::AddSub => {
                     Token![+] => BinOp::Add,
@@ -124,7 +132,7 @@ fn parse_binding(parser: &mut Parser, bp: BindingPower) -> Result<NodeId<ast::Ex
         break;
     }
 
-    Ok(expr)
+    Ok(lhs)
 }
 
 fn parse_unary(parser: &mut Parser) -> Result<NodeId<ast::Expr>> {
@@ -143,6 +151,21 @@ fn parse_unary(parser: &mut Parser) -> Result<NodeId<ast::Expr>> {
 
     let left = parse_prime(parser)?;
 
-    let unary = parser.push(ast::UnaryExpr { op, span, left })?;
+    let unary = parser.push(ast::UnaryExpr {
+        op,
+        span,
+        expr: left,
+    })?;
     parser.push(ast::Expr::Unary(unary))
+}
+
+fn parse_call(parser: &mut Parser, callee: NodeId<ast::Expr>) -> Result<NodeId<ast::Expr>> {
+    let span = parser.span();
+    let args = parser.parse_parenthesized(|parser| parser.parse_terminated::<_, Token![,]>())?;
+    let call = parser.push(ast::Call {
+        func: callee,
+        args,
+        span,
+    })?;
+    parser.push(ast::Expr::Call(call))
 }

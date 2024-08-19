@@ -36,6 +36,10 @@ pub fn parse_prime(parser: &mut Parser) -> Result<NodeId<ast::Expr>> {
         let expr = parser.parse()?;
         return parser.push(ast::Expr::Let(expr));
     }
+    if parser.peek(Token![return]) {
+        let expr = parser.parse()?;
+        return parser.push(ast::Expr::Return(expr));
+    }
     if parser.peek(Lit) {
         let expr = parser.parse_syn_push()?;
         return parser.push(ast::Expr::Literal(expr));
@@ -110,5 +114,20 @@ impl Parse for ast::Let {
         parser.parse_syn::<Token![=]>()?;
         let expr = parser.parse()?;
         parser.push(Self { name, expr, span })
+    }
+}
+
+impl Parse for ast::Return {
+    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
+        let span = parser.parse_syn::<Token![return]>()?.span();
+        if parser.peek(Token![;]) || parser.is_empty() {
+            return parser.push(ast::Return { expr: None, span });
+        }
+
+        let expr = parser.parse()?;
+        parser.push(ast::Return {
+            expr: Some(expr),
+            span,
+        })
     }
 }

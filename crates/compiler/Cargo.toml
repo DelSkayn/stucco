@@ -1,0 +1,10 @@
+[package]
+name = "stucco-compiler"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ast = { version = "0.1.0", path = "../ast", package = "stucco-ast" }
+common = { version = "0.1.0", path = "../common", package = "stucco-common" }
+parser = { version = "0.1.0", path = "../parser", package = "stucco-parser" }
+syn = { version = "2.0.75", default-features = false }

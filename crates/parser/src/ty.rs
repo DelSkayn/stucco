@@ -42,6 +42,7 @@ impl Parse for ast::TypeFn {
             parser.parse_parenthesized(|parser| parser.parse_terminated::<_, Token![,]>())?;
 
         let output = if parser.peek(Token![->]) {
+            parser.parse_syn::<Token![->]>()?;
             Some(parser.parse()?)
         } else {
             None

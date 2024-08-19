@@ -27,26 +27,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3d1d046238990b9cf5bcde22a3fb3584ee5cf65fb2765f454ed428c7a0063da"
 
 [[package]]
-name = "bytemuck"
-version = "1.16.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "102087e286b4677862ea56cf8fc58bb2cdfa8725c40ffb80fe3a008eb7f2fc83"
-dependencies = [
- "bytemuck_derive",
-]
-
-[[package]]
-name = "bytemuck_derive"
-version = "1.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ee891b04274a59bd38b412188e24b849617b2e45a0fd8d057deb63e7403761b"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -267,8 +247,22 @@ dependencies = [
 name = "stucco-ast"
 version = "0.1.0"
 dependencies = [
- "bytemuck",
  "proc-macro2",
+ "stucco-common",
+ "syn",
+]
+
+[[package]]
+name = "stucco-common"
+version = "0.1.0"
+
+[[package]]
+name = "stucco-compiler"
+version = "0.1.0"
+dependencies = [
+ "stucco-ast",
+ "stucco-common",
+ "stucco-parser",
  "syn",
 ]
 
@@ -278,6 +272,7 @@ version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "stucco-ast",
+ "stucco-common",
  "syn",
 ]
 
@@ -302,9 +297,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.72"
+version = "2.0.75"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc4b9b9bf2add8093d3f2c0204471e951b2285580335de42f9d2534f3ae7a8af"
+checksum = "f6af063034fc1935ede7be0122941bafa9bacb949334d090b77ca98b5817c7d9"
 dependencies = [
  "proc-macro2",
  "quote",

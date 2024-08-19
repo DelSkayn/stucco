@@ -1,10 +1,10 @@
 mod ast;
-pub mod thinvec;
+pub mod visit;
 
 use ast::NodeLibrary;
 pub use ast::{AstSpanned, NodeId, NodeList, NodeListId, PushNodeError, Span, Spanned};
+use common::thinvec::ThinVec;
 use syn::{Ident, Lit};
-use thinvec::ThinVec;
 
 #[cfg(feature = "print")]
 pub use ast::{AstDisplay, AstFormatter, AstRender};
@@ -44,6 +44,7 @@ library!(Library {
     tail: ThinVec<Tail>,
 
     type_: ThinVec<Type>,
+    types: ThinVec<NodeList<Type>>,
     type_fn: ThinVec<TypeFn>,
     type_array: ThinVec<TypeArray>,
     type_tuple: ThinVec<TypeTuple>,
@@ -63,9 +64,9 @@ ast_enum! {
         If(NodeId<If>),
         Binary(NodeId<BinaryExpr>),
         Unary(NodeId<UnaryExpr>),
-        Block(NodeId<Expr>),
+        Block(NodeId<Block>),
         Cast(NodeId<Cast>),
-        Loop(NodeId<Expr>),
+        Loop(NodeId<Block>),
         While(NodeId<While>),
         Let(NodeId<Let>),
         Continue(Span),
@@ -170,7 +171,7 @@ where
 ast_struct! {
     pub struct UnaryExpr {
         pub op: UnOp,
-        pub left: NodeId<Expr>,
+        pub expr: NodeId<Expr>,
     }
 }
 
@@ -224,7 +225,7 @@ ast_struct! {
 ast_struct! {
     pub struct Index {
         pub base: NodeId<Expr>,
-        pub field: NodeId<Expr>,
+        pub index: NodeId<Expr>,
     }
 }
 
@@ -334,17 +335,8 @@ ast_struct! {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use crate::{ast::Span, Ast, Expr};
-
-    #[test]
-    fn create_ast() {
-        let mut ast = Ast::new();
-        let cont_node = ast.push(Expr::Continue(Span::call_site())).unwrap();
-        let loop_node = ast.push(Expr::Loop(cont_node)).unwrap();
-
-        assert!(matches!(ast[cont_node], Expr::Continue(_)));
-        assert!(matches!(ast[loop_node], Expr::Loop(_)));
+ast_struct! {
+    pub struct Block {
+        pub body: Option<NodeListId<Expr>>
     }
 }

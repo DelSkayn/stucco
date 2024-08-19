@@ -4,45 +4,17 @@ use std::{
     fmt::{self},
     hash::{Hash, Hasher},
     marker::PhantomData,
-    num::NonZeroU32,
     ops::{Index, IndexMut},
     u32,
 };
 
 #[cfg(feature = "print")]
 mod print;
+use common::id;
 #[cfg(feature = "print")]
 pub use print::{AstDisplay, AstFormatter, AstRender};
 
-pub struct NodeId<T> {
-    id: NonZeroU32,
-    _marker: PhantomData<T>,
-}
-impl<T> Clone for NodeId<T> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-impl<T> Copy for NodeId<T> {}
-impl<T> PartialEq for NodeId<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-    }
-}
-impl<T> Eq for NodeId<T> {}
-impl<T> Hash for NodeId<T> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.hash(state)
-    }
-}
-
-impl<T> fmt::Debug for NodeId<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("NodeId")
-            .field("id", &self.into_u32())
-            .finish()
-    }
-}
+id!(NodeId<T>);
 
 impl<T> NodeId<T> {
     pub fn index<L>(self, ast: &Ast<L>) -> &T
@@ -59,23 +31,6 @@ impl<T> NodeId<T> {
         T: 'static,
     {
         &mut ast[self]
-    }
-
-    fn from_u32(index: u32) -> Option<Self> {
-        if index > (u32::MAX - 1) {
-            return None;
-        }
-
-        unsafe {
-            Some(NodeId {
-                id: NonZeroU32::new_unchecked(index as u32 ^ u32::MAX),
-                _marker: PhantomData,
-            })
-        }
-    }
-
-    fn into_u32(self) -> u32 {
-        self.id.get() ^ u32::MAX
     }
 }
 
@@ -210,25 +165,28 @@ where
         }
     }
 
-    pub fn next_list<'a, T: 'static>(&'a self, id: &mut Option<NodeListId<T>>) -> Option<&'a T> {
+    pub fn next_list<'a, T: 'static>(
+        &'a self,
+        id: &mut Option<NodeListId<T>>,
+    ) -> Option<NodeId<T>> {
         let node = (*id)?;
 
         *id = self[node].next;
         let v = self[node].value;
 
-        Some(&self[v])
+        Some(v)
     }
 
     pub fn next_list_mut<'a, T: 'static>(
         &'a mut self,
         id: &mut Option<NodeListId<T>>,
-    ) -> Option<&'a mut T> {
+    ) -> Option<NodeId<T>> {
         let node = (*id)?;
 
         *id = self[node].next;
         let v = self[node].value;
 
-        Some(&mut self[v])
+        Some(v)
     }
 }
 
@@ -244,7 +202,8 @@ where
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.ast.next_list(&mut self.current)
+        let idx = self.ast.next_list(&mut self.current)?;
+        Some(&self.ast[idx])
     }
 }
 

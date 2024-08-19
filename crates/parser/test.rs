@@ -29,7 +29,6 @@ mod foo {
         tail!(next(stack))
     }
 
-    /*
     fn previous_constant<const C: u64>(stack: *mut u64) {
         let stack = stack - C;
         tail!(next(stack))
@@ -72,5 +71,4 @@ mod foo {
     fn finish(stack: *mut u64) {
         return;
     }
-    */
 }
