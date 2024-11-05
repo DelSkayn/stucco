@@ -9,8 +9,7 @@ mod imp {
 #[cfg(feature = "span-locations")]
 mod imp {
     pub fn render(source: &str, err: syn::Error) -> String {
-        common::error::render(source, err.span().byte_range(), &err.to_string())
+        common::error::render_block(source, err.span().byte_range(), &err.to_string())
     }
 }
 pub use imp::render;
-

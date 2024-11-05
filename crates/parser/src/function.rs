@@ -14,7 +14,7 @@ impl Parse for ast::StencilFunction {
         };
 
         let span = parser.parse_syn::<Token![fn]>()?.span();
-        let name = parser.parse_syn_push::<Ident>()?;
+        let sym = parser.parse()?;
 
         let mut head = None;
         let mut current = None;
@@ -67,7 +67,7 @@ impl Parse for ast::StencilFunction {
         })?;
 
         parser.push(ast::StencilFunction {
-            name,
+            sym,
             entry,
             parameters,
             span,
@@ -81,10 +81,10 @@ impl Parse for ast::StencilFunction {
 impl Parse for ast::Parameter {
     fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
         let span = parser.span();
-        let name = parser.parse_syn_push()?;
+        let sym = parser.parse()?;
         parser.parse_syn::<Token![:]>()?;
         let ty = parser.parse()?;
 
-        parser.push(Self { name, ty, span })
+        parser.push(Self { sym, ty, span })
     }
 }

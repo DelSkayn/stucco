@@ -72,6 +72,13 @@ fn parse_binding(parser: &mut Parser, bp: BindingPower) -> Result<NodeId<ast::Ex
             lhs = parse_call(parser, lhs)?;
             continue;
         }
+        if parser.peek(Token![.]) {
+            if BindingPower::CallIndex < bp {
+                break;
+            }
+            lhs = parse_dot(parser, lhs)?;
+            continue;
+        }
 
         parse_bin_op! {
             lhs,parser,bp {
@@ -168,4 +175,28 @@ fn parse_call(parser: &mut Parser, callee: NodeId<ast::Expr>) -> Result<NodeId<a
         span,
     })?;
     parser.push(ast::Expr::Call(call))
+}
+
+fn parse_dot(parser: &mut Parser, base: NodeId<ast::Expr>) -> Result<NodeId<ast::Expr>> {
+    let span = parser.parse_syn::<Token![.]>()?.span();
+    if parser.peek2(token::Paren) {
+        let ident = parser.parse_syn_push()?;
+        let args =
+            parser.parse_parenthesized(|parser| parser.parse_terminated::<_, Token![,]>())?;
+        let call = parser.push(ast::Method {
+            receiver: base,
+            name: ident,
+            args,
+            span,
+        })?;
+        parser.push(ast::Expr::Method(call))
+    } else {
+        let ident = parser.parse_syn_push()?;
+        let field = parser.push(ast::Field {
+            base,
+            field: ident,
+            span,
+        })?;
+        parser.push(ast::Expr::Field(field))
+    }
 }

@@ -9,7 +9,52 @@ enum Truncation {
     Both,
 }
 
-pub fn render(source: &str, location: Range<usize>, message: &str) -> String {
+pub fn render_line(source: &str, location: Range<usize>) -> String {
+    if source == "" {
+        panic!("an empty string should not be able to generate an error")
+    }
+
+    let lines = get_lines(source);
+    let start_line = find_line(location.start, &lines);
+    let end_line = find_line(location.end, &lines);
+    let start_col = find_column(location.start, lines[start_line].0, lines[start_line].1);
+
+    let error_columns = if start_line != end_line {
+        1
+    } else {
+        let end_col = find_column(location.end, lines[start_line].0, lines[start_line].1);
+        end_col - start_col
+    };
+
+    let (snippet_str, offset, trunc) =
+        extract_snippet(lines[start_line].1, start_col, error_columns);
+
+    let mut buf = String::new();
+
+    if matches!(trunc, Truncation::Both | Truncation::Start) {
+        write!(buf, "...").unwrap();
+    }
+
+    for (idx, c) in snippet_str.chars().enumerate() {
+        if idx == offset {
+            write!(buf, "\x1b[30;47m").unwrap()
+        }
+
+        buf.push(c);
+
+        if idx + 1 == offset + error_columns {
+            write!(buf, "\x1b[0m").unwrap()
+        }
+    }
+
+    if matches!(trunc, Truncation::Both | Truncation::End) {
+        write!(buf, "...").unwrap();
+    }
+
+    buf
+}
+
+pub fn render_block(source: &str, location: Range<usize>, message: &str) -> String {
     if source == "" {
         panic!("an empty string should not be able to generate an error")
     }

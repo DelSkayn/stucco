@@ -1,4 +1,4 @@
-use ast::{Ast, NodeId, NodeListId, Span, Spanned};
+use ast::{Ast, Node, NodeId, NodeListId, Span, Spanned};
 use proc_macro2::{extra::DelimSpan, Delimiter, TokenStream};
 use std::{
     fmt,
@@ -49,7 +49,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         Ok((p, ast))
     }
 
-    pub fn push<T: 'static>(&mut self, value: T) -> Result<NodeId<T>> {
+    pub fn push<T: ast::Node>(&mut self, value: T) -> Result<NodeId<T>> {
         Ok(self.ast.push(value)?)
     }
 
@@ -69,7 +69,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         P::parse(self.buffer)
     }
 
-    pub fn parse_syn_push<P: SynParse + 'static>(&mut self) -> Result<NodeId<P>> {
+    pub fn parse_syn_push<P: SynParse + Node>(&mut self) -> Result<NodeId<P>> {
         let p = P::parse(self.buffer)?;
         Ok(self.push(p)?)
     }
@@ -141,7 +141,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     pub fn parse_terminated<P, D>(&mut self) -> Result<Option<NodeListId<P>>>
     where
-        P: Parse + 'static,
+        P: Parse + Node,
         D: SynParse,
     {
         let mut head = None;
@@ -189,7 +189,7 @@ impl DerefMut for Parser<'_, '_> {
 impl Parse for ast::Module {
     fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
         let span = parser.parse_syn::<Token![mod]>()?.span();
-        let name = parser.parse_syn_push::<Ident>()?;
+        let sym = parser.parse()?;
 
         let mut end_span = None;
         let functions = parser.parse_braced(|parser| {
@@ -211,9 +211,9 @@ impl Parse for ast::Module {
         let span = span.try_join(end_span);
 
         Ok(parser.push(ast::Module {
-            span,
-            name,
+            sym,
             functions,
+            span,
         })?)
     }
 }

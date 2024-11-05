@@ -1,4 +1,4 @@
-use ast::{NodeId, NodeListId, Spanned as _};
+use ast::{NodeId, NodeListId, Spanned};
 use syn::{token::Paren, Ident, Lit, Result, Token};
 
 use crate::{kw, Parse, Parser};
@@ -54,8 +54,8 @@ pub fn parse_prime(parser: &mut Parser) -> Result<NodeId<ast::Expr>> {
         })?;
         return parser.push(ast::Expr::Covered(expr));
     }
-    let parse = parser.parse_syn_push::<Ident>()?;
-    parser.push(ast::Expr::Ident(parse))
+    let parse = parser.parse()?;
+    parser.push(ast::Expr::Symbol(parse))
 }
 
 impl Parse for ast::If {
@@ -118,12 +118,12 @@ impl Parse for ast::Let {
             false
         };
 
-        let name = parser.parse_syn_push()?;
+        let sym = parser.parse()?;
         parser.parse_syn::<Token![=]>()?;
         let expr = parser.parse()?;
 
         parser.push(Self {
-            name,
+            sym,
             mutable,
             expr,
             span,
@@ -143,5 +143,14 @@ impl Parse for ast::Return {
             expr: Some(expr),
             span,
         })
+    }
+}
+
+impl Parse for ast::Symbol {
+    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
+        let ident: Ident = parser.parse_syn()?;
+        let span = Spanned::span(&ident);
+        let ident = parser.push(ident)?;
+        parser.push(ast::Symbol { name: ident, span })
     }
 }

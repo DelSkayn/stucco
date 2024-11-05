@@ -2,7 +2,7 @@ use inkwell::{
     attributes::Attribute,
     builder::Builder,
     context::Context,
-    llvm_sys::{object, LLVMCallConv},
+    llvm_sys::LLVMCallConv,
     memory_buffer::MemoryBuffer,
     module::{Linkage, Module},
     targets::{FileType, Target, TargetTriple},
@@ -18,7 +18,6 @@ use syn::{spanned::Spanned, Error, GenericParam, ItemFn, Result, ReturnType};
 #[cfg(not(target_arch = "x86_64"))]
 compile_error!("TARGET not supported");
 
-mod ast;
 mod obj;
 mod value;
 use value::{Mutability, Signing, Symbol, Ty, Value};

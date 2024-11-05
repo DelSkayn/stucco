@@ -1,6 +1,6 @@
 use crate::{
     Ast, BinaryExpr, Block, Break, Call, Cast, Expr, Field, If, Index, Let, Method, Module, NodeId,
-    NodeListId, Parameter, Return, Span, StencilFunction, Tail, Type, UnaryExpr, Variant,
+    NodeListId, Parameter, Return, Span, StencilFunction, Symbol, Tail, Type, UnaryExpr, Variant,
     VariantConstant, While,
 };
 use syn::{Ident, Lit};
@@ -18,11 +18,6 @@ pub trait Visit: Sized {
         f: NodeId<StencilFunction>,
     ) -> Result<(), Self::Error> {
         visit_stencil_function(self, ast, f)
-    }
-
-    fn visit_ident(&mut self, ast: &Ast, f: NodeId<Ident>) -> Result<(), Self::Error> {
-        let _ = (ast, f);
-        Ok(())
     }
 
     fn visit_variant(&mut self, ast: &Ast, f: NodeId<Variant>) -> Result<(), Self::Error> {
@@ -127,6 +122,15 @@ pub trait Visit: Sized {
         let _ = (ast, f);
         Ok(())
     }
+
+    fn visit_symbol(&mut self, ast: &Ast, f: NodeId<Symbol>) -> Result<(), Self::Error> {
+        visit_symbol(self, ast, f)
+    }
+
+    fn visit_ident(&mut self, ast: &Ast, f: NodeId<Ident>) -> Result<(), Self::Error> {
+        let _ = (ast, f);
+        Ok(())
+    }
 }
 
 pub fn visit_module<V>(visit: &mut V, ast: &Ast, m: NodeId<Module>) -> Result<(), V::Error>
@@ -148,7 +152,7 @@ pub fn visit_stencil_function<V>(
 where
     V: Visit,
 {
-    visit.visit_ident(ast, ast[m].name);
+    visit.visit_symbol(ast, ast[m].sym)?;
 
     let mut cur = ast[m].variants;
     while let Some(f) = ast.next_list(&mut cur) {
@@ -164,10 +168,7 @@ where
         visit.visit_type(ast, ty)?;
     }
 
-    let mut cur = ast[m].body;
-    while let Some(f) = ast.next_list(&mut cur) {
-        visit.visit_expr(ast, f)?
-    }
+    visit.visit_inner_block(ast, ast[m].body)?;
 
     Ok(())
 }
@@ -189,7 +190,7 @@ pub fn visit_variant_constant<V>(
 where
     V: Visit,
 {
-    visit.visit_ident(ast, ast[m].name)?;
+    visit.visit_symbol(ast, ast[m].sym)?;
     visit.visit_type(ast, ast[m].ty)?;
 
     Ok(())
@@ -199,7 +200,7 @@ pub fn visit_parameter<V>(visit: &mut V, ast: &Ast, m: NodeId<Parameter>) -> Res
 where
     V: Visit,
 {
-    visit.visit_ident(ast, ast[m].name)?;
+    visit.visit_symbol(ast, ast[m].sym)?;
     visit.visit_type(ast, ast[m].ty)?;
 
     Ok(())
@@ -227,7 +228,7 @@ where
         Expr::Field(x) => visit.visit_field(ast, x),
         Expr::Index(x) => visit.visit_index(ast, x),
         Expr::Literal(x) => visit.visit_literal(ast, x),
-        Expr::Ident(x) => visit.visit_ident(ast, x),
+        Expr::Symbol(x) => visit.visit_symbol(ast, x),
         Expr::Covered(x) => visit.visit_expr(ast, x),
     }
 }
@@ -320,7 +321,7 @@ pub fn visit_let<V>(visit: &mut V, ast: &Ast, e: NodeId<Let>) -> Result<(), V::E
 where
     V: Visit,
 {
-    visit.visit_ident(ast, ast[e].name)?;
+    visit.visit_symbol(ast, ast[e].sym)?;
     visit.visit_expr(ast, ast[e].expr)?;
     Ok(())
 }
@@ -395,4 +396,11 @@ where
     }
 
     Ok(())
+}
+
+pub fn visit_symbol<V>(visit: &mut V, ast: &Ast, s: NodeId<Symbol>) -> Result<(), V::Error>
+where
+    V: Visit,
+{
+    visit.visit_ident(ast, ast[s].name)
 }

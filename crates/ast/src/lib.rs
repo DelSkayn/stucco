@@ -1,13 +1,16 @@
 mod ast;
 pub mod visit;
 
+pub use ast::Node;
 use ast::NodeLibrary;
 pub use ast::{AstSpanned, NodeId, NodeList, NodeListId, PushNodeError, Span, Spanned};
-use common::thinvec::ThinVec;
+use common::{id::IdSet, thinvec::ThinVec};
 use syn::{Ident, Lit};
 
 #[cfg(feature = "print")]
 pub use ast::{AstDisplay, AstFormatter, AstRender};
+
+type LibrarySet<T> = IdSet<u32, T>;
 
 library!(Library {
     module: ThinVec<Module>,
@@ -54,13 +57,15 @@ library!(Library {
     arg: ThinVec<Arg>,
     args: ThinVec<NodeList<Arg>>,
 
-    ident: ThinVec<Ident>,
+    symbol: ThinVec<Symbol>,
+
+    ident: LibrarySet<Ident>,
 });
 
 pub type Ast = ast::Ast<Library>;
 
 ast_enum! {
-    pub enum Expr {
+        pub enum Expr {
         If(NodeId<If>),
         Binary(NodeId<BinaryExpr>),
         Unary(NodeId<UnaryExpr>),
@@ -78,13 +83,13 @@ ast_enum! {
         Field(NodeId<Field>),
         Index(NodeId<Index>),
         Literal(NodeId<Lit>),
-        Ident(NodeId<Ident>),
+        Symbol(NodeId<Symbol>),
         Covered(NodeId<Expr>),
     }
 }
 
 ast_struct! {
-    pub struct If {
+        pub struct If {
         pub condition: NodeId<Expr>,
         pub then: Option<NodeListId<Expr>>,
         pub otherwise: Option<NodeListId<Expr>>,
@@ -92,13 +97,13 @@ ast_struct! {
 }
 
 ast_struct! {
-    pub struct While {
+        pub struct While {
         pub condition: NodeId<Expr>,
         pub then: Option<NodeListId<Expr>>,
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
 pub enum BinOp {
     Add,
     Sub,
@@ -143,14 +148,14 @@ where
 }
 
 ast_struct! {
-    pub struct BinaryExpr {
+        pub struct BinaryExpr {
         pub left: NodeId<Expr>,
         pub op: BinOp,
         pub right: NodeId<Expr>,
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug, Hash)]
 pub enum UnOp {
     Star,
     Not,
@@ -169,62 +174,62 @@ where
 }
 
 ast_struct! {
-    pub struct UnaryExpr {
+        pub struct UnaryExpr {
         pub op: UnOp,
         pub expr: NodeId<Expr>,
     }
 }
 
 ast_struct! {
-    pub struct Cast {
+        pub struct Cast {
         pub expr: NodeId<Expr>,
         pub ty: NodeId<Type>,
     }
 }
 
 ast_struct! {
-    pub struct Break {
+        pub struct Break {
         pub expr: Option<NodeId<Expr>>,
     }
 }
 
 ast_struct! {
-    pub struct Return {
+        pub struct Return {
         pub expr: Option<NodeId<Expr>>,
     }
 }
 
 ast_struct! {
-    pub struct Tail{
+        pub struct Tail{
         pub callee: NodeId<Ident>,
         pub args: Option<NodeListId<Expr>>,
     }
 }
 
 ast_struct! {
-    pub struct Let {
-        pub name: NodeId<Ident>,
+        pub struct Let {
+        pub sym: NodeId<Symbol>,
         pub mutable: bool,
         pub expr: NodeId<Expr>,
     }
 }
 
 ast_struct! {
-    pub struct Call {
+        pub struct Call {
         pub func: NodeId<Expr>,
         pub args: Option<NodeListId<Expr>>,
     }
 }
 
 ast_struct! {
-    pub struct Field {
+        pub struct Field {
         pub base: NodeId<Expr>,
         pub field: NodeId<Ident>,
     }
 }
 
 ast_struct! {
-    pub struct Index {
+        pub struct Index {
         pub base: NodeId<Expr>,
         pub index: NodeId<Expr>,
     }
@@ -250,41 +255,41 @@ ast_enum! {
 }
 
 ast_struct! {
-    pub struct TypeArray {
+        pub struct TypeArray {
         pub elem: NodeId<Type>,
         pub len: NodeId<Expr>,
     }
 }
 
 ast_struct! {
-    pub struct TypeFn {
+        pub struct TypeFn {
         pub params: Option<NodeListId<Type>>,
         pub output: Option<NodeId<Type>>,
     }
 }
 
 ast_struct! {
-    pub struct Arg {
-        pub name: NodeId<Ident>,
+        pub struct Arg {
+        pub sym: NodeId<Symbol>,
         pub ty: NodeId<Type>,
     }
 }
 
 ast_struct! {
-    pub struct TypeTuple {
+        pub struct TypeTuple {
         pub fields: Option<NodeListId<Type>>,
     }
 }
 
 ast_struct! {
-    pub struct TypePtr {
+        pub struct TypePtr {
         pub mutable: bool,
         pub ty: NodeId<Type>,
     }
 }
 
 ast_struct! {
-    pub struct TypeReference {
+        pub struct TypeReference {
         pub mutable: bool,
         pub ty: NodeId<Type>,
     }
@@ -292,14 +297,14 @@ ast_struct! {
 
 ast_struct! {
     pub struct Module {
-        pub name: NodeId<Ident>,
+        pub sym: NodeId<Symbol>,
         pub functions: Option<NodeListId<StencilFunction>>,
     }
 }
 
 ast_struct! {
-    pub struct StencilFunction {
-        pub name: NodeId<Ident>,
+        pub struct StencilFunction {
+        pub sym: NodeId<Symbol>,
         pub entry: bool,
         pub variants: Option<NodeListId<Variant>>,
         pub parameters: Option<NodeListId<Parameter>>,
@@ -309,21 +314,21 @@ ast_struct! {
 }
 
 ast_enum! {
-    pub enum Variant {
+        pub enum Variant {
         Constant(NodeId<VariantConstant>),
     }
 }
 
 ast_struct! {
-    pub struct VariantConstant {
-        pub name: NodeId<Ident>,
+        pub struct VariantConstant {
+        pub sym: NodeId<Symbol>,
         pub ty: NodeId<Type>,
     }
 }
 
 ast_struct! {
     pub struct Function {
-        pub name: NodeId<Ident>,
+        pub sym: NodeId<Symbol>,
         pub parameters: Option<NodeListId<Parameter>>,
         pub body: Option<NodeListId<Expr>>,
     }
@@ -331,7 +336,7 @@ ast_struct! {
 
 ast_struct! {
     pub struct Parameter {
-        pub name: NodeId<Ident>,
+        pub sym: NodeId<Symbol>,
         pub ty: NodeId<Type>,
     }
 }
@@ -339,5 +344,11 @@ ast_struct! {
 ast_struct! {
     pub struct Block {
         pub body: Option<NodeListId<Expr>>
+    }
+}
+
+ast_struct! {
+    pub struct Symbol {
+        pub name: NodeId<Ident>,
     }
 }

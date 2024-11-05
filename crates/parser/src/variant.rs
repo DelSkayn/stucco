@@ -17,10 +17,10 @@ impl Parse for ast::Variant {
 impl Parse for ast::VariantConstant {
     fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
         let span = parser.parse_syn::<Token![const]>()?.span();
-        let name = parser.parse_syn_push::<Ident>()?;
+        let sym = parser.parse()?;
         parser.parse_syn::<Token![:]>()?;
         let ty = parser.parse::<ast::Type>()?;
 
-        parser.push(ast::VariantConstant { name, ty, span })
+        parser.push(ast::VariantConstant { sym, ty, span })
     }
 }

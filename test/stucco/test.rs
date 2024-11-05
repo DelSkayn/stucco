@@ -5,12 +5,12 @@ mod foo {
     }
 
     fn next(stack: *mut u64) {
-        let stack = stack + 1;
+        let stack = stack.add(1);
         tail!(next(stack))
     }
 
     fn previous(stack: *mut u64) {
-        let stack = stack - 1;
+        let stack = stack.sub(1);
         tail!(next(stack))
     }
 

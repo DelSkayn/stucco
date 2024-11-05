@@ -1,4 +1,5 @@
-use super::{Ast, NodeId, NodeLibrary, NodeListId, Span};
+use super::{Ast, Node, NodeId, NodeLibrary, NodeListId, Span};
+use common::render::IndentFormatter;
 use std::fmt;
 use syn::{Ident, Lit};
 
@@ -16,26 +17,22 @@ impl<'a, L, N> AstRender<'a, L, N> {
 impl<'a, L, N> fmt::Display for AstRender<'a, L, N>
 where
     L: NodeLibrary,
-    N: for<'f> AstDisplay<L, fmt::Formatter<'f>>,
+    N: for<'b, 'c> AstDisplay<L, &'b mut fmt::Formatter<'c>>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut buffer = String::new();
+        let mut formatter = IndentFormatter::new(f, 2);
         let mut formatter = AstFormatter {
-            buffer: &mut buffer,
             ast: self.ast,
-            w: f,
-            depth: 0,
+            fmt: &mut formatter,
         };
         self.node.fmt(&mut formatter)?;
-        formatter.flush()
+        formatter.fmt.finish()
     }
 }
 
 pub struct AstFormatter<'a, L, W> {
     pub ast: &'a Ast<L>,
-    buffer: &'a mut String,
-    w: &'a mut W,
-    depth: usize,
+    pub fmt: &'a mut IndentFormatter<W>,
 }
 
 impl<'a, L, W> AstFormatter<'a, L, W>
@@ -43,34 +40,26 @@ where
     L: NodeLibrary,
     W: fmt::Write,
 {
-    fn flush(&mut self) -> fmt::Result {
-        self.w.write_str(&self.buffer)?;
-        self.buffer.clear();
-        Ok(())
-    }
-
     pub fn indent<F>(&mut self, f: F) -> fmt::Result
     where
         F: FnOnce(&mut AstFormatter<L, W>) -> fmt::Result,
     {
-        self.depth += 1;
-        let res = f(self);
-        self.depth -= 1;
-        res
+        self.fmt.indent(|fmt| {
+            let mut this = AstFormatter { ast: self.ast, fmt };
+            f(&mut this)
+        })
     }
 
     pub fn scope<N, F>(&mut self, n: NodeId<N>, f: F) -> fmt::Result
     where
         F: for<'b> FnOnce(&'b N, &'b mut AstFormatter<L, W>) -> fmt::Result,
-        N: 'static,
+        N: 'static + Node,
     {
         let borrow = &self.ast[n];
         let res = {
             let mut formatter = AstFormatter {
                 ast: self.ast,
-                buffer: self.buffer,
-                w: self.w,
-                depth: self.depth,
+                fmt: self.fmt,
             };
             f(borrow, &mut formatter)
         };
@@ -89,47 +78,7 @@ where
     W: fmt::Write,
 {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        let flush_last = s.ends_with('\n');
-        let mut last = None;
-        for line in s.lines() {
-            if let Some(x) = last.replace(line) {
-                if !self.buffer.is_empty() {
-                    self.w.write_str(&self.buffer)?;
-                    self.buffer.clear();
-                } else {
-                    for _ in 0..self.depth {
-                        self.w.write_char(' ')?;
-                        self.w.write_char(' ')?;
-                    }
-                }
-                self.w.write_str(x)?;
-                self.w.write_char('\n')?;
-            }
-        }
-        if let Some(x) = last {
-            if flush_last {
-                if self.buffer.is_empty() {
-                    for _ in 0..self.depth {
-                        self.w.write_char(' ')?;
-                        self.w.write_char(' ')?;
-                    }
-                } else {
-                    self.w.write_str(self.buffer)?;
-                    self.buffer.clear();
-                }
-                self.w.write_str(x)?;
-                self.w.write_char('\n')?;
-            } else {
-                if self.buffer.is_empty() {
-                    for _ in 0..self.depth {
-                        self.buffer.push(' ');
-                        self.buffer.push(' ');
-                    }
-                }
-                self.buffer.push_str(x);
-            }
-        }
-        Ok(())
+        self.fmt.write_str(s)
     }
 }
 
@@ -164,7 +113,7 @@ where
     L: NodeLibrary,
     W: fmt::Write,
     NodeId<T>: AstDisplay<L, W>,
-    T: 'static,
+    T: Node,
 {
     fn fmt(&self, fmt: &mut AstFormatter<L, W>) -> fmt::Result {
         writeln!(fmt, "[")?;
@@ -186,7 +135,7 @@ impl<L, W, T> AstDisplay<L, W> for NodeId<T>
 where
     L: NodeLibrary,
     W: fmt::Write,
-    T: AstDisplay<L, W> + 'static,
+    T: AstDisplay<L, W> + Node + 'static,
 {
     fn fmt(&self, fmt: &mut AstFormatter<L, W>) -> fmt::Result {
         write!(fmt, "[{}]", self.into_u32())?;
