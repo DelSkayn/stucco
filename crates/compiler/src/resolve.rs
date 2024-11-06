@@ -21,6 +21,7 @@ id!(ScopeSymbolId);
 pub enum SymbolKind {
     Module,
     StencilFunction,
+    Constant,
     Variant,
     Parameter,
     Local,
@@ -232,7 +233,8 @@ impl Resolver {
                     | SymbolKind::Variant
                     | SymbolKind::Parameter
                     | SymbolKind::Local
-                    | SymbolKind::LocalMut => {}
+                    | SymbolKind::LocalMut
+                    | SymbolKind::Constant => {}
                 },
                 SymbolKind::Variant => match kind {
                     SymbolKind::Variant => {
@@ -242,7 +244,8 @@ impl Resolver {
                     | SymbolKind::Parameter
                     | SymbolKind::Module
                     | SymbolKind::Local
-                    | SymbolKind::LocalMut => {}
+                    | SymbolKind::LocalMut
+                    | SymbolKind::Constant => {}
                 },
                 SymbolKind::Parameter => match kind {
                     SymbolKind::Parameter => {
@@ -258,9 +261,10 @@ impl Resolver {
                     | SymbolKind::Variant
                     | SymbolKind::Module
                     | SymbolKind::Local
-                    | SymbolKind::LocalMut => {}
+                    | SymbolKind::LocalMut
+                    | SymbolKind::Constant => {}
                 },
-                SymbolKind::Local | SymbolKind::LocalMut => {}
+                SymbolKind::Local | SymbolKind::LocalMut | SymbolKind::Constant => {}
             }
         }
 

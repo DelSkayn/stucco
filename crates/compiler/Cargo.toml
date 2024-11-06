@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ast = { version = "0.1.0", path = "../ast", package = "stucco-ast" }
-common = { version = "0.1.0", path = "../common", package = "stucco-common" }
-syn = { version = "2.0.75", default-features = false }
+ast = { workspace = true }
+common = { workspace = true }
+syn = { workspace = true ,default-features = false }
 
 [dev-dependencies]
-parser = { version = "0.1.0", path = "../parser", package = "stucco-parser" }
+parser = { workspace = true }

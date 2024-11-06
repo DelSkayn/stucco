@@ -41,7 +41,7 @@ pub fn parse_prime(parser: &mut Parser) -> Result<NodeId<ast::Expr>> {
         return parser.push(ast::Expr::Return(expr));
     }
     if parser.peek(Lit) {
-        let expr = parser.parse_syn_push()?;
+        let expr = parser.parse()?;
         return parser.push(ast::Expr::Literal(expr));
     }
     if parser.peek(Paren) {
@@ -118,6 +118,13 @@ impl Parse for ast::Let {
             false
         };
 
+        let ty = if parser.peek(Token![:]) {
+            parser.parse_syn::<Token![:]>()?;
+            Some(parser.parse()?)
+        } else {
+            None
+        };
+
         let sym = parser.parse()?;
         parser.parse_syn::<Token![=]>()?;
         let expr = parser.parse()?;
@@ -125,6 +132,7 @@ impl Parse for ast::Let {
         parser.push(Self {
             sym,
             mutable,
+            ty,
             expr,
             span,
         })
@@ -152,5 +160,33 @@ impl Parse for ast::Symbol {
         let span = Spanned::span(&ident);
         let ident = parser.push(ident)?;
         parser.push(ast::Symbol { name: ident, span })
+    }
+}
+
+impl Parse for Lit {
+    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
+        let p = parser.parse_syn::<Lit>()?;
+        match p {
+            Lit::Str(_) | Lit::ByteStr(_) | Lit::CStr(_) | Lit::Byte(_) | Lit::Char(_) => {}
+            Lit::Int(ref x) => match x.suffix() {
+                "isize" | "usize" | "i64" | "u64" | "i32" | "u32" | "i16" | "u16" | "i8" | "u8"
+                | "" => {}
+                "i128" | "u128" => {
+                    return Err(syn::Error::new(
+                        p.span(),
+                        "Invalid integer suffix, 128 bit integers are not supported",
+                    ))
+                }
+                _ => return Err(syn::Error::new(p.span(), "Invalid integer suffix")),
+            },
+            Lit::Float(ref f) => match f.suffix() {
+                "f32" | "f64" | "" => {}
+                _ => return Err(syn::Error::new(p.span(), "Invalid floating point suffix")),
+            },
+            Lit::Bool(_) => todo!(),
+            Lit::Verbatim(_) => return Err(syn::Error::new(p.span(), "Invalid token")),
+            _ => unreachable!(),
+        }
+        parser.push(p)
     }
 }

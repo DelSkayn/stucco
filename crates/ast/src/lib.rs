@@ -210,6 +210,7 @@ ast_struct! {
         pub struct Let {
         pub sym: NodeId<Symbol>,
         pub mutable: bool,
+        pub ty: Option<NodeId<Type>>,
         pub expr: NodeId<Expr>,
     }
 }

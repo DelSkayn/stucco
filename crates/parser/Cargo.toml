@@ -8,10 +8,10 @@ span-locations = ["ast/span-locations"]
 default = ["span-locations"]
 
 [dependencies]
-ast = { package = "stucco-ast", version = "0.1.0", path = "../ast", default-features=false }
-common = { version = "0.1.0", path = "../common", package = "stucco-common" }
-proc-macro2 = "1.0.86"
-syn = { version = "2.0.72", default-features = false, features = ["parsing","printing"] }
+ast = { workspace = true }
+common = { workspace = true }
+proc-macro2 = { workspace = true }
+syn = { workspace = true , default-features = false, features = ["parsing","printing"]}
 
 [dev-dependencies]
-ast = { package = "stucco-ast", version = "0.1.0", path = "../ast", default-features=false, features = ["print"] }
+ast = { workspace = true, features = ["print"] }

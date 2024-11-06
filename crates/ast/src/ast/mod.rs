@@ -254,6 +254,13 @@ where
         }
     }
 
+    pub fn iter_list_node<T>(&self, id: Option<NodeListId<T>>) -> ListIterNode<L, T> {
+        ListIterNode {
+            ast: self,
+            current: id,
+        }
+    }
+
     pub fn next_list<'a, T: Node>(&'a self, id: &mut Option<NodeListId<T>>) -> Option<NodeId<T>> {
         let node = (*id)?;
 
@@ -290,6 +297,23 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let idx = self.ast.next_list(&mut self.current)?;
         Some(&self.ast[idx])
+    }
+}
+
+pub struct ListIterNode<'a, L, T> {
+    ast: &'a Ast<L>,
+    current: Option<NodeListId<T>>,
+}
+
+impl<'a, L, T: Node> Iterator for ListIterNode<'a, L, T>
+where
+    L: NodeLibrary,
+{
+    type Item = NodeId<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let idx = self.ast.next_list(&mut self.current)?;
+        Some(idx)
     }
 }
 

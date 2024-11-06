@@ -8,7 +8,7 @@ use syn::{
     parse::{
         discouraged::AnyDelimiter, Parse as SynParse, ParseBuffer, ParseStream, Parser as _, Peek,
     },
-    Ident, Result, Token,
+    Result, Token,
 };
 
 pub mod error;
@@ -161,6 +161,15 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     pub fn peek<T: Peek>(&self, token: T) -> bool {
         self.buffer.peek(token)
+    }
+
+    pub fn eat<T: Peek + SynParse>(&self, token: T) -> bool {
+        if self.peek(token) {
+            self.parse_syn::<T>().unwrap();
+            true
+        } else {
+            false
+        }
     }
 
     pub fn peek2<T: Peek>(&self, token: T) -> bool {
