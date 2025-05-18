@@ -8,4 +8,4 @@ proc-macro = true
 
 [dependencies]
 proc-macro2 = "1.0.86"
-stucco_derive_impl = { version = "0.1.0", path = "../derive_impl" }
+runner.workspace = true

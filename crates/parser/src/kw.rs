@@ -1,4 +1,5 @@
 use syn::custom_keyword;
 
-custom_keyword!(tail);
-custom_keyword!(entry);
+custom_keyword!(stencil);
+custom_keyword!(variant);
+custom_keyword!(slot);

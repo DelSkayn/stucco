@@ -1,4 +1,5 @@
 use ast::{Ast, NodeId, Span};
+use infer::TypeError;
 use std::{error, fmt};
 
 pub mod infer;
@@ -10,7 +11,14 @@ pub enum Error {
     RedeclaredFunction(Span),
     RedeclaredVariant(Span),
     RedeclaredParameter { redecl: Span, original: Span },
+    Type(TypeError),
     PushNode,
+}
+
+impl From<TypeError> for Error {
+    fn from(value: TypeError) -> Self {
+        Error::Type(value)
+    }
 }
 
 impl fmt::Display for Error {
@@ -27,6 +35,9 @@ impl fmt::Display for Error {
             }
             Error::RedeclaredParameter { .. } => {
                 write!(f, "Function parameter redeclared")
+            }
+            Error::Type(e) => {
+                write!(f, "Type error: {:?}", e)
             }
             Error::PushNode => {
                 write!(f, "Exceeded node limits")
@@ -60,6 +71,9 @@ impl Error {
                     "First declared here",
                 );
                 format!("{a}\n{b}")
+            }
+            Error::Type(_) => {
+                format!("Type error")
             }
             Error::PushNode => "Exceeded node limits".to_string(),
         }

@@ -7,7 +7,7 @@ use ast::{
     visit::{self, Visit},
     Ast, NodeId, NodeListId,
 };
-use ast::{AstSpanned, StencilFunction};
+use ast::{AstSpanned, Stencil};
 use common::{id, id::IdVec};
 use syn::Ident;
 
@@ -20,9 +20,7 @@ id!(ScopeSymbolId);
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum SymbolKind {
     Module,
-    StencilFunction,
-    Constant,
-    Variant,
+    Stencil,
     Parameter,
     Local,
     LocalMut,
@@ -45,7 +43,7 @@ pub struct Symbol {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum ScopeDeclaration {
     Root,
-    StencilFunction(NodeId<StencilFunction>),
+    StencilFunction(NodeId<Stencil>),
     Block(NodeListId<ast::Expr>),
 }
 
@@ -225,27 +223,14 @@ impl Resolver {
         if let Some(shadows) = shadows {
             match self.symbols.symbols[shadows].kind {
                 SymbolKind::Module => {}
-                SymbolKind::StencilFunction => match kind {
-                    SymbolKind::StencilFunction => {
+                SymbolKind::Stencil => match kind {
+                    SymbolKind::Stencil => {
                         return Err(Error::RedeclaredFunction(sym.ast_span(&ast)))
                     }
                     SymbolKind::Module
-                    | SymbolKind::Variant
                     | SymbolKind::Parameter
                     | SymbolKind::Local
-                    | SymbolKind::LocalMut
-                    | SymbolKind::Constant => {}
-                },
-                SymbolKind::Variant => match kind {
-                    SymbolKind::Variant => {
-                        return Err(Error::RedeclaredVariant(sym.ast_span(&ast)))
-                    }
-                    SymbolKind::StencilFunction
-                    | SymbolKind::Parameter
-                    | SymbolKind::Module
-                    | SymbolKind::Local
-                    | SymbolKind::LocalMut
-                    | SymbolKind::Constant => {}
+                    | SymbolKind::LocalMut => {}
                 },
                 SymbolKind::Parameter => match kind {
                     SymbolKind::Parameter => {
@@ -257,14 +242,12 @@ impl Resolver {
                             original,
                         });
                     }
-                    SymbolKind::StencilFunction
-                    | SymbolKind::Variant
+                    SymbolKind::Stencil
                     | SymbolKind::Module
                     | SymbolKind::Local
-                    | SymbolKind::LocalMut
-                    | SymbolKind::Constant => {}
+                    | SymbolKind::LocalMut => {}
                 },
-                SymbolKind::Local | SymbolKind::LocalMut | SymbolKind::Constant => {}
+                SymbolKind::Local | SymbolKind::LocalMut => {}
             }
         }
 
@@ -303,7 +286,7 @@ impl Visit for Resolver {
         self.declare_symbol(ast, ast[f].sym, kind)
     }
 
-    fn visit_tail(&mut self, ast: &Ast, t: NodeId<ast::Tail>) -> Result<(), Self::Error> {
+    fn visit_become(&mut self, ast: &Ast, t: NodeId<ast::Become>) -> Result<(), Self::Error> {
         let mut cur = ast[t].args;
         while let Some(x) = ast.next_list(&mut cur) {
             self.visit_expr(ast, x)?;
@@ -338,12 +321,8 @@ impl Visit for Resolver {
         Ok(())
     }
 
-    fn visit_stencil_function(
-        &mut self,
-        ast: &Ast,
-        f: NodeId<ast::StencilFunction>,
-    ) -> Result<(), Self::Error> {
-        self.declare_symbol(ast, f.index(ast).sym, SymbolKind::StencilFunction)?;
+    fn visit_stencil(&mut self, ast: &Ast, f: NodeId<ast::Stencil>) -> Result<(), Self::Error> {
+        self.declare_symbol(ast, f.index(ast).sym, SymbolKind::Stencil)?;
 
         self.pending_scopes
             .push(Scope::new(ScopeDeclaration::StencilFunction(f)));
@@ -351,18 +330,9 @@ impl Visit for Resolver {
         let next_scope = self.pending_scopes.len();
         let next_symbol = self.pending_symbols.len();
 
-        visit::visit_stencil_function(self, ast, f)?;
+        visit::visit_stencil(self, ast, f)?;
 
         self.finish_scope(ast, next_scope, next_symbol)
-    }
-
-    fn visit_variant(&mut self, ast: &Ast, f: NodeId<ast::Variant>) -> Result<(), Self::Error> {
-        match ast[f] {
-            ast::Variant::Constant(x) => {
-                self.declare_symbol(ast, ast[x].sym, SymbolKind::Variant)?;
-            }
-        }
-        Ok(())
     }
 
     fn visit_parameter(&mut self, ast: &Ast, p: NodeId<ast::Parameter>) -> Result<(), Self::Error> {

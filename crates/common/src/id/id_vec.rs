@@ -108,6 +108,12 @@ impl<I: Id, T> IdVec<I, T> {
     }
 }
 
+impl<I: Id, T: Default> IdVec<I, T> {
+    pub fn insert_fill_default(&mut self, at: I, value: T) {
+        self.insert_fill(at, value, Default::default);
+    }
+}
+
 impl<I: Id, T> Index<I> for IdVec<I, T> {
     type Output = T;
 

@@ -1,0 +1,7 @@
+stencil add(a: *mut usize, b: usize)
+    variant
+        slot a,
+        const b,
+{
+    a.add(b).write(b);
+}

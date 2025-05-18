@@ -1,23 +1,7 @@
-use ast::{NodeId, NodeListId, Spanned};
+use ast::{NodeId, Spanned};
 use syn::{token::Paren, Ident, Lit, Result, Token};
 
-use crate::{kw, Parse, Parser};
-
-pub fn parse_block(parser: &mut Parser) -> Result<Option<NodeListId<ast::Expr>>> {
-    parser.parse_braced(|parser| {
-        let mut head = None;
-        let mut current = None;
-        while !parser.is_empty() {
-            let expr = parser.parse()?;
-            parser.push_list(&mut head, &mut current, expr)?;
-
-            if parser.peek(Token![;]) {
-                parser.parse_syn::<Token![;]>()?;
-            }
-        }
-        Ok(head)
-    })
-}
+use crate::{Parse, Parser};
 
 pub fn parse_prime(parser: &mut Parser) -> Result<NodeId<ast::Expr>> {
     if parser.peek(Token![if]) {
@@ -28,9 +12,14 @@ pub fn parse_prime(parser: &mut Parser) -> Result<NodeId<ast::Expr>> {
         let expr = parser.parse()?;
         return parser.push(ast::Expr::While(expr));
     }
-    if parser.peek(kw::tail) {
+    if parser.peek(Token![loop]) {
+        parser.parse_syn::<Token![loop]>()?;
         let expr = parser.parse()?;
-        return parser.push(ast::Expr::Tail(expr));
+        return parser.push(ast::Expr::Loop(expr));
+    }
+    if parser.peek(Token![become]) {
+        let expr = parser.parse()?;
+        return parser.push(ast::Expr::Become(expr));
     }
     if parser.peek(Token![let]) {
         let expr = parser.parse()?;
@@ -39,6 +28,10 @@ pub fn parse_prime(parser: &mut Parser) -> Result<NodeId<ast::Expr>> {
     if parser.peek(Token![return]) {
         let expr = parser.parse()?;
         return parser.push(ast::Expr::Return(expr));
+    }
+    if parser.peek(Token![break]) {
+        let expr = parser.parse()?;
+        return parser.push(ast::Expr::Break(expr));
     }
     if parser.peek(Lit) {
         let expr = parser.parse()?;
@@ -62,10 +55,10 @@ impl Parse for ast::If {
     fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
         let span = parser.parse_syn::<Token![if]>()?.span();
         let condition = parser.parse()?;
-        let then = parse_block(parser)?;
+        let then = parser.parse()?;
         let otherwise = if parser.peek(Token![else]) {
             parser.parse_syn::<Token![else]>()?;
-            parse_block(parser)?
+            Some(parser.parse()?)
         } else {
             None
         };
@@ -83,7 +76,7 @@ impl Parse for ast::While {
     fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
         let span = parser.parse_syn::<Token![while]>()?.span();
         let condition = parser.parse()?;
-        let then = parse_block(parser)?;
+        let then = parser.parse()?;
 
         parser.push(ast::While {
             span,
@@ -93,17 +86,14 @@ impl Parse for ast::While {
     }
 }
 
-impl Parse for ast::Tail {
+impl Parse for ast::Become {
     fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
         let span = parser.span();
-        parser.parse_syn::<kw::tail>()?;
-        parser.parse_syn::<Token![!]>()?;
-        parser.parse_parenthesized(|parser| {
-            let callee = parser.parse_syn_push()?;
-            let args =
-                parser.parse_parenthesized(|parser| parser.parse_terminated::<_, Token![,]>())?;
-            parser.push(Self { callee, args, span })
-        })
+        parser.parse_syn::<Token![become]>()?;
+        let callee = parser.parse_syn_push()?;
+        let args =
+            parser.parse_parenthesized(|parser| parser.parse_terminated::<_, Token![,]>())?;
+        parser.push(Self { callee, args, span })
     }
 }
 
@@ -154,6 +144,21 @@ impl Parse for ast::Return {
     }
 }
 
+impl Parse for ast::Break {
+    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
+        let span = parser.parse_syn::<Token![break]>()?.span();
+        if parser.peek(Token![;]) || parser.is_empty() {
+            return parser.push(ast::Break { expr: None, span });
+        }
+
+        let expr = parser.parse()?;
+        parser.push(ast::Break {
+            expr: Some(expr),
+            span,
+        })
+    }
+}
+
 impl Parse for ast::Symbol {
     fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
         let ident: Ident = parser.parse_syn()?;
@@ -163,14 +168,55 @@ impl Parse for ast::Symbol {
     }
 }
 
+impl Parse for ast::Block {
+    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
+        let span = parser.span();
+        let mut returns_last = false;
+        let body = parser.parse_braced(|parser| {
+            let mut head = None;
+            let mut current = None;
+            loop {
+                if parser.is_empty() {
+                    break;
+                }
+
+                let expr = parser.parse()?;
+                parser.push_list(&mut head, &mut current, expr)?;
+
+                returns_last = true;
+
+                // TODO: Handle semicolons better
+                if parser.peek(Token![;]) {
+                    returns_last = false;
+                    parser.parse_syn::<Token![;]>()?;
+                }
+            }
+            Ok(head)
+        })?;
+
+        parser.push(ast::Block {
+            body,
+            span,
+            returns_last,
+        })
+    }
+}
+
 impl Parse for Lit {
     fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
         let p = parser.parse_syn::<Lit>()?;
         match p {
-            Lit::Str(_) | Lit::ByteStr(_) | Lit::CStr(_) | Lit::Byte(_) | Lit::Char(_) => {}
+            Lit::Str(_) | Lit::ByteStr(_) | Lit::CStr(_) | Lit::Byte(_) | Lit::Char(_) => {
+                return Err(syn::Error::new(p.span(), "Literal type not yet supported"))
+            }
             Lit::Int(ref x) => match x.suffix() {
-                "isize" | "usize" | "i64" | "u64" | "i32" | "u32" | "i16" | "u16" | "i8" | "u8"
-                | "" => {}
+                "i64" | "u64" | "" => {}
+                "isize" | "usize" | "i32" | "u32" | "i16" | "u16" | "i8" | "u8" => {
+                    return Err(syn::Error::new(
+                        p.span(),
+                        format_args!("Invalid integer suffix, {} not yet supported", x.suffix()),
+                    ))
+                }
                 "i128" | "u128" => {
                     return Err(syn::Error::new(
                         p.span(),
@@ -180,10 +226,16 @@ impl Parse for Lit {
                 _ => return Err(syn::Error::new(p.span(), "Invalid integer suffix")),
             },
             Lit::Float(ref f) => match f.suffix() {
-                "f32" | "f64" | "" => {}
+                "f64" | "" => {}
+                "f32" => {
+                    return Err(syn::Error::new(
+                        p.span(),
+                        format_args!("Invalid integer suffix, {} not yet supported", f.suffix()),
+                    ))
+                }
                 _ => return Err(syn::Error::new(p.span(), "Invalid floating point suffix")),
             },
-            Lit::Bool(_) => todo!(),
+            Lit::Bool(_) => {}
             Lit::Verbatim(_) => return Err(syn::Error::new(p.span(), "Invalid token")),
             _ => unreachable!(),
         }

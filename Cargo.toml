@@ -7,10 +7,12 @@ edition = "2021"
 members = ["crates/*"]
 
 [workspace.dependencies]
-ast = { path = "./crates/ast", package = "stucco-ast"}
-common = { path = "./crates/common", package = "stucco-common"}
-compiler = { path = "./crates/compiler", package = "stucco-compiler"}
-parser = { path = "./crates/parser", package = "stucco-parser"}
+ast = { path = "./crates/ast", package = "stucco_ast"}
+common = { path = "./crates/common", package = "stucco_common"}
+compiler = { path = "./crates/compiler", package = "stucco_compiler"}
+parser = { path = "./crates/parser", package = "stucco_parser"}
+derive = { path = "./crates/derive", package = "stucco_derive"}
+runner = { path = "./crates/runner", package = "stucco_runner"}
 
 syn = { version = "2.0.72", features = ["extra-traits"], default-features = false }
 proc-macro2 = "1.0.86"
@@ -19,6 +21,6 @@ hashbrown = {version = "0.14.5"}
 [dependencies]
 memmap2 = "0.9.4"
 object = { version = "0.36.2", features = ["write"] }
-stucco-parser = { version = "0.1.0", path = "crates/parser" }
-stucco_derive = { version = "0.1.0", path = "crates/derive" }
+parser = { workspace = true }
+derive = { workspace = true }
 

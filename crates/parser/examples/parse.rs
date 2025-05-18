@@ -1,6 +1,6 @@
 use ast::AstRender;
 use std::{env, error::Error, io::Read};
-use stucco_parser::Parser;
+use stucco_parser::{parse_external_module, Parser};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let src = if let Some(arg) = env::args().skip(1).next() {
@@ -11,7 +11,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         buf
     };
 
-    match Parser::parse_str::<ast::Module>(&src) {
+    match Parser::parse_str_func(&src, parse_external_module) {
         Ok((node, ast)) => {
             println!("{}", AstRender::new(&ast, node));
         }

@@ -1,0 +1,13 @@
+[package]
+name = "stucco_codegen"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["stand-alone"]
+stand-alone = ["inkwell/llvm18-1"]
+proc-macro = ["inkwell/llvm18-1-no-llvm-linking"]
+
+[dependencies]
+inkwell = { version = "0.6.0", features = ["llvm18-1"] }
+object = "0.36.2"

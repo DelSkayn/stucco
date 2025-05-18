@@ -8,7 +8,7 @@ use common::{
     render::{self, IndentFormatter},
 };
 use core::fmt;
-use parser::Parser;
+use parser::{parse_external_module, Parser};
 use std::{env, error::Error, fmt::Write as _, io::Read};
 use stucco_compiler::resolve::{resolve, Symbols};
 
@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         buf
     };
 
-    let (node, ast) = match Parser::parse_str::<ast::Module>(&src) {
+    let (node, ast) = match Parser::parse_str_func(&src, parse_external_module) {
         Ok((node, ast)) => (node, ast),
         Err(e) => {
             eprintln!("ERROR: {}", parser::error::render(&src, e));
@@ -88,17 +88,17 @@ where
         writeln!(self.fmt, "}}")
     }
 
-    fn visit_stencil_function(
+    fn visit_stencil(
         &mut self,
         ast: &Ast,
-        f: ast::NodeId<ast::StencilFunction>,
+        f: ast::NodeId<ast::Stencil>,
     ) -> Result<(), Self::Error> {
         writeln!(
             self.fmt,
-            "fn {} {{",
+            "stencil {} {{",
             f.index(ast).sym.index(ast).name.index(ast)
         )?;
-        self.indent(|this| visit::visit_stencil_function(this, ast, f))?;
+        self.indent(|this| visit::visit_stencil(this, ast, f))?;
         writeln!(self.fmt, "}}")
     }
 

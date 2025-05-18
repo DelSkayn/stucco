@@ -1,4 +1,4 @@
-use crate::Parser;
+use crate::{parse_wrapped_module, Parser};
 
 #[test]
 fn empty_module() {
@@ -7,10 +7,10 @@ fn empty_module() {
         }
     "#;
 
-    let (module, ast) = Parser::parse_str::<ast::Module>(m).unwrap();
+    let (module, ast) = Parser::parse_str_func(m, parse_wrapped_module).unwrap();
 
     let module = &ast[module];
-    assert_eq!(ast[module.sym].name.index(&ast), "foo");
+    assert_eq!(ast[module.sym.unwrap()].name.index(&ast), "foo");
     assert!(module.functions.is_none());
 }
 
@@ -24,10 +24,10 @@ fn empty_function() {
         }
     "#;
 
-    let (module, ast) = Parser::parse_str::<ast::Module>(m).unwrap();
+    let (module, ast) = Parser::parse_str_func(m, parse_wrapped_module).unwrap();
 
     let module = &ast[module];
-    assert_eq!(module.sym.index(&ast).name.index(&ast), "foo");
+    assert_eq!(module.sym.unwrap().index(&ast).name.index(&ast), "foo");
     let func = module.functions.unwrap();
     let func = ast[func].value;
     assert_eq!(func.index(&ast).sym.index(&ast).name.index(&ast), "bar");

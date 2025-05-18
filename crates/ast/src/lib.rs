@@ -15,13 +15,17 @@ type LibrarySet<T> = IdSet<u32, T>;
 library!(Library {
     module: ThinVec<Module>,
 
-    stencil_function: ThinVec<StencilFunction>,
-    stencil_functions: ThinVec<NodeList<StencilFunction>>,
+    stencil_function: ThinVec<Stencil>,
+    stencil_functions: ThinVec<NodeList<Stencil>>,
 
     variant: ThinVec<Variant>,
     variants: ThinVec<NodeList<Variant>>,
 
-    variant_constant: ThinVec<VariantConstant>,
+    variation: ThinVec<Variation>,
+    variations: ThinVec<NodeList<Variation>>,
+
+    variation_slot: ThinVec<VariationSlot>,
+    variation_constant: ThinVec<VariationConstant>,
 
     parameter: ThinVec<Parameter>,
     parameters: ThinVec<NodeList<Parameter>>,
@@ -32,6 +36,7 @@ library!(Library {
     unary: ThinVec<UnaryExpr>,
     if_: ThinVec<If>,
     while_: ThinVec<While>,
+    block: ThinVec<Block>,
 
     literal: ThinVec<Lit>,
 
@@ -44,7 +49,7 @@ library!(Library {
 
     break_: ThinVec<Break>,
     return_: ThinVec<Return>,
-    tail: ThinVec<Tail>,
+    tail: ThinVec<Become>,
 
     type_: ThinVec<Type>,
     types: ThinVec<NodeList<Type>>,
@@ -77,7 +82,7 @@ ast_enum! {
         Continue(Span),
         Break(NodeId<Break>),
         Return(NodeId<Return>),
-        Tail(NodeId<Tail>),
+        Become(NodeId<Become>),
         Call(NodeId<Call>),
         Method(NodeId<Method>),
         Field(NodeId<Field>),
@@ -91,15 +96,15 @@ ast_enum! {
 ast_struct! {
         pub struct If {
         pub condition: NodeId<Expr>,
-        pub then: Option<NodeListId<Expr>>,
-        pub otherwise: Option<NodeListId<Expr>>,
+        pub then: NodeId<Block>,
+        pub otherwise: Option<NodeId<Block>>,
     }
 }
 
 ast_struct! {
         pub struct While {
         pub condition: NodeId<Expr>,
-        pub then: Option<NodeListId<Expr>>,
+        pub then: NodeId<Block>,
     }
 }
 
@@ -200,7 +205,7 @@ ast_struct! {
 }
 
 ast_struct! {
-        pub struct Tail{
+        pub struct Become{
         pub callee: NodeId<Ident>,
         pub args: Option<NodeListId<Expr>>,
     }
@@ -298,32 +303,45 @@ ast_struct! {
 
 ast_struct! {
     pub struct Module {
-        pub sym: NodeId<Symbol>,
-        pub functions: Option<NodeListId<StencilFunction>>,
+        // Can be None when the module is reference externally.
+        pub sym: Option<NodeId<Symbol>>,
+        pub functions: Option<NodeListId<Stencil>>,
     }
 }
 
 ast_struct! {
-        pub struct StencilFunction {
+        pub struct Stencil {
         pub sym: NodeId<Symbol>,
-        pub entry: bool,
-        pub variants: Option<NodeListId<Variant>>,
         pub parameters: Option<NodeListId<Parameter>>,
+        pub variants: Option<NodeListId<Variant>>,
         pub output: Option<NodeId<Type>>,
-        pub body: Option<NodeListId<Expr>>,
+        /// Guaranteed to be Expr::Block
+        pub body: NodeId<Expr>
+    }
+}
+
+ast_struct! {
+    pub struct Variant {
+        pub variations: Option<NodeListId<Variation>>
     }
 }
 
 ast_enum! {
-        pub enum Variant {
-        Constant(NodeId<VariantConstant>),
+    pub enum Variation {
+        Constant(NodeId<VariationConstant>),
+        Slot(NodeId<VariationSlot>),
     }
 }
 
 ast_struct! {
-        pub struct VariantConstant {
+    pub struct VariationConstant {
         pub sym: NodeId<Symbol>,
-        pub ty: NodeId<Type>,
+    }
+}
+
+ast_struct! {
+    pub struct VariationSlot{
+        pub sym: NodeId<Symbol>,
     }
 }
 
@@ -344,7 +362,8 @@ ast_struct! {
 
 ast_struct! {
     pub struct Block {
-        pub body: Option<NodeListId<Expr>>
+        pub body: Option<NodeListId<Expr>>,
+        pub returns_last: bool,
     }
 }
 

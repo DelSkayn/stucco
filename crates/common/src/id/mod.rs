@@ -65,12 +65,18 @@ macro_rules! id {
                 }
 
                 unsafe {
-                    Some(Self{
+                    Some(Self::from_u32_unchecked(index))
+                }
+            }
+
+            const unsafe fn from_u32_unchecked(index: u32) -> Self {
+                unsafe {
+                    Self{
                         id: ::std::num::NonZeroU32::new_unchecked(index as u32 ^ u32::MAX),
                         $(
                             _marker: ::std::marker::PhantomData::<$($gen),*>,
                         )?
-                    })
+                    }
                 }
             }
 

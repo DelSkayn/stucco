@@ -1,12 +1,13 @@
 [package]
-name = "stucco_derive_impl"
+name = "stucco_runner"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 proc-macro2 = "1.0.86"
 syn = {version = "2.0.71", features = ["extra-traits","full"]}
-inkwell = { git = "https://github.com/TheDan64/inkwell", features = ["llvm18-0-no-llvm-linking"] }
 quote = "1.0.36"
-object = "0.36.2"
+parser = { workspace = true }
+ast = { workspace = true }
+compiler = { workspace = true }
 

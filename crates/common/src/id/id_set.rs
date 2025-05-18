@@ -1,4 +1,7 @@
-use std::hash::{BuildHasher, Hash, Hasher, RandomState};
+use std::{
+    hash::{BuildHasher, Hash, Hasher, RandomState},
+    ops::{Index, IndexMut},
+};
 
 use hashbrown::raw::RawTable;
 
@@ -75,5 +78,29 @@ where
 
     pub fn is_empty(&self) -> bool {
         self.storage.is_empty()
+    }
+}
+
+impl<I, V, S> Index<I> for IdSet<I, V, S>
+where
+    I: Id,
+    V: Eq + Hash,
+    S: BuildHasher,
+{
+    type Output = V;
+
+    fn index(&self, index: I) -> &Self::Output {
+        self.get(index).unwrap()
+    }
+}
+
+impl<I, V, S> IndexMut<I> for IdSet<I, V, S>
+where
+    I: Id,
+    V: Eq + Hash,
+    S: BuildHasher,
+{
+    fn index_mut(&mut self, index: I) -> &mut Self::Output {
+        self.get_mut(index).unwrap()
     }
 }

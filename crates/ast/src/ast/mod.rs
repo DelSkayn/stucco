@@ -537,6 +537,7 @@ macro_rules! ast_struct {
         $(#[$m:meta])*
         $vis:vis struct $name:ident {
             $(
+                $(#[$field_m:meta])*
                 pub $field:ident: $ty:ty
             ),*$(,)?
         }
@@ -547,6 +548,7 @@ macro_rules! ast_struct {
         #[derive(Clone,Copy,Debug,PartialEq,Eq,Hash)]
         $vis struct $name {
             $(
+                $(#[$field_m])*
                 pub $field: $ty,
             )*
             pub span: crate::ast::Span

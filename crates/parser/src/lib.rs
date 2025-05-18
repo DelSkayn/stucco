@@ -1,4 +1,4 @@
-use ast::{Ast, Node, NodeId, NodeListId, Span, Spanned};
+use ast::{Ast, AstSpanned, Node, NodeId, NodeListId, Span, Spanned};
 use proc_macro2::{extra::DelimSpan, Delimiter, TokenStream};
 use std::{
     fmt,
@@ -13,9 +13,9 @@ use syn::{
 
 pub mod error;
 mod expr;
-mod function;
 mod kw;
 mod prime;
+mod stencil;
 #[cfg(test)]
 mod test;
 mod ty;
@@ -25,6 +25,20 @@ pub trait Parse: Sized {
     fn parse(parser: &mut Parser) -> Result<NodeId<Self>>;
 }
 
+pub trait ParseFunc: Sized {
+    type Result;
+
+    fn parse(self, parser: &mut Parser) -> Result<Self::Result>;
+}
+
+impl<T, F: FnOnce(&mut Parser) -> Result<T>> ParseFunc for F {
+    type Result = T;
+
+    fn parse(self, parser: &mut Parser) -> Result<T> {
+        self(parser)
+    }
+}
+
 pub struct Parser<'a, 'b> {
     buffer: &'a ParseBuffer<'a>,
     ast: &'b mut Ast,
@@ -32,21 +46,34 @@ pub struct Parser<'a, 'b> {
 
 impl<'a, 'b> Parser<'a, 'b> {
     pub fn parse_stream<P: Parse>(token_stream: TokenStream) -> Result<(NodeId<P>, Ast)> {
-        (Self::parse_inner::<P>).parse2(token_stream)
+        (Self::parse_inner(P::parse)).parse2(token_stream)
+    }
+
+    pub fn parse_stream_func<F: ParseFunc>(
+        token_stream: TokenStream,
+        func: F,
+    ) -> Result<(F::Result, Ast)> {
+        (Self::parse_inner(func)).parse2(token_stream)
     }
 
     pub fn parse_str<P: Parse>(str: &str) -> Result<(NodeId<P>, Ast)> {
-        (Self::parse_inner::<P>).parse_str(str)
+        (Self::parse_inner(P::parse)).parse_str(str)
     }
 
-    fn parse_inner<P: Parse>(buffer: ParseStream) -> Result<(NodeId<P>, Ast)> {
-        let mut ast = Ast::new();
-        let mut parser = Parser {
-            ast: &mut ast,
-            buffer,
-        };
-        let p = P::parse(&mut parser)?;
-        Ok((p, ast))
+    pub fn parse_str_func<F: ParseFunc>(str: &str, func: F) -> Result<(F::Result, Ast)> {
+        (Self::parse_inner(func)).parse_str(str)
+    }
+
+    fn parse_inner<F: ParseFunc>(f: F) -> impl FnOnce(ParseStream) -> Result<(F::Result, Ast)> {
+        move |buffer| {
+            let mut ast = Ast::new();
+            let mut parser = Parser {
+                ast: &mut ast,
+                buffer,
+            };
+            let p = f.parse(&mut parser)?;
+            Ok((p, ast))
+        }
     }
 
     pub fn push<T: ast::Node>(&mut self, value: T) -> Result<NodeId<T>> {
@@ -76,6 +103,10 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     pub fn parse<P: Parse>(&mut self) -> Result<NodeId<P>> {
         P::parse(self)
+    }
+
+    pub fn parse_func<F: ParseFunc>(&mut self, func: F) -> Result<F::Result> {
+        func.parse(self)
     }
 
     pub fn delimiter_to_expected(delim: Delimiter) -> &'static str {
@@ -195,34 +226,62 @@ impl DerefMut for Parser<'_, '_> {
     }
 }
 
-impl Parse for ast::Module {
-    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
-        let span = parser.parse_syn::<Token![mod]>()?.span();
-        let sym = parser.parse()?;
+/// parses a module in the form of `mod bla { stencil foo() { .. } }`
+pub fn parse_wrapped_module(parser: &mut Parser) -> Result<NodeId<ast::Module>> {
+    let span = parser.parse_syn::<Token![mod]>()?.span();
+    let sym = parser.parse()?;
 
-        let mut end_span = None;
-        let functions = parser.parse_braced(|parser| {
-            let mut head = None;
-            let mut current = None;
-            loop {
-                if parser.is_empty() {
-                    break;
-                }
-
-                let func = parser.parse()?;
-                parser.push_list(&mut head, &mut current, func)?;
+    let mut end_span = None;
+    let functions = parser.parse_braced(|parser| {
+        let mut head = None;
+        let mut current = None;
+        loop {
+            if parser.is_empty() {
+                break;
             }
-            end_span = Some(parser.span());
-            Ok(head)
-        })?;
 
-        let end_span = end_span.unwrap();
-        let span = span.try_join(end_span);
+            let func = parser.parse()?;
+            parser.push_list(&mut head, &mut current, func)?;
+        }
+        end_span = Some(parser.span());
+        Ok(head)
+    })?;
 
-        Ok(parser.push(ast::Module {
-            sym,
-            functions,
-            span,
-        })?)
+    let end_span = end_span.unwrap();
+    let span = span.try_join(end_span);
+
+    Ok(parser.push(ast::Module {
+        sym: Some(sym),
+        functions,
+        span,
+    })?)
+}
+
+/// parses a module in the form of `stencil foo() { .. }` i.e. imported from an external file.
+pub fn parse_external_module(parser: &mut Parser) -> Result<NodeId<ast::Module>> {
+    let start_span = parser.span();
+    let mut end_span = None;
+
+    let mut head = None;
+    let mut current = None;
+    loop {
+        if parser.is_empty() {
+            break;
+        }
+        let func = parser.parse()?;
+        end_span = Some(func.ast_span(parser));
+        parser.push_list(&mut head, &mut current, func)?;
     }
+
+    let span = if let Some(end) = end_span {
+        start_span.try_join(end)
+    } else {
+        start_span
+    };
+
+    Ok(parser.push(ast::Module {
+        sym: None,
+        functions: head,
+        span,
+    })?)
 }

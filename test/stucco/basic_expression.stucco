@@ -1,0 +1,15 @@
+mod test{
+    stencil add(a: usize, b: usize)
+        variant
+            slot a,
+            const b,
+    {
+        loop{
+            if true {
+                break 1
+            }else{
+                break 2u64
+            }
+        }
+    }
+}

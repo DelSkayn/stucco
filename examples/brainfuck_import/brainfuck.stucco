@@ -1,0 +1,83 @@
+stencil next(stack: *mut usize, count: usize)
+    variant
+        const count,
+        slot stack,
+{
+    let stack = stack.add(count);
+    become next(stack);
+}
+    
+stencil previous(stack: *mut usize, count: usize)
+    variant
+        const count,
+        slot stack,
+{
+    let stack = stack.sub(count);
+    become next(stack);
+}
+
+stencil increment(stack: *mut usize, by: usize)
+    variant
+        const by,
+        slot stack,
+{
+    stack.write(stack.read() + by);
+    become next(stack)
+}
+
+stencil decrement(stack: *mut usize, by: usize)
+    variant
+        const by,
+        slot stack,
+{
+    stack.write(stack.read() - by);
+    become next(stack)
+}
+
+stencil put(stack: *mut usize, write: fn(usize))
+    variant
+        const write,
+        slot stack,
+{
+    write(stack.read());
+    become next(stack)
+}
+
+
+stencil gets(stack: *mut usize, read: fn() -> usize)
+    variant
+        const read,
+        slot stack,
+{
+    stack.write(read());
+    become next(stack)
+}
+
+stencil jump_forward(stack: *mut usize)
+    variant
+        slot stack
+{
+    if stack.read() == 0 {
+        become forward(stack)
+    }
+    become next(stack)
+}
+
+
+stencil jump_backward(stack: *mut usize)
+    variant
+        slot stack
+{
+    if stack.read() != 0 {
+        become backward(stack)
+    }
+    become next(stack)
+}
+
+stencil halt(stack: *mut usize)
+    variant
+        slot stack
+{
+    return;
+}
+
