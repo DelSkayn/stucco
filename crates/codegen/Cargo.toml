@@ -9,5 +9,12 @@ stand-alone = ["inkwell/llvm18-1"]
 proc-macro = ["inkwell/llvm18-1-no-llvm-linking"]
 
 [dependencies]
+# Workspace dependencies
+ast.workspace = true
+common.workspace = true
+compiler.workspace = true
+
+# LLVM bindings
 inkwell = { version = "0.6.0", features = ["llvm18-1"] }
+# Object file parsing
 object = "0.36.2"

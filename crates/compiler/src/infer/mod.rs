@@ -3,8 +3,8 @@ use core::num;
 use std::{cell::Cell, collections::HashMap, fmt::Write, hash::Hash};
 
 use ast::{
-    visit::{self, Visit},
     Ast, Block, Expr, Method, NodeId, Span,
+    visit::{self, Visit},
 };
 use common::{id, id::IdVec, iter::IterExt};
 use syn::Ident;
@@ -178,7 +178,7 @@ impl Types {
                 }
                 return self.unify(*a, *b);
             }
-            (Ty::Tuple(ref tup1), Ty::Tuple(ref tup2)) => {
+            (Ty::Tuple(tup1), Ty::Tuple(tup2)) => {
                 if tup1.len() != tup2.len() {
                     return Err(TypeError::TupleSize(a, b));
                 }
@@ -186,7 +186,7 @@ impl Types {
                     self.unify(a, b)?;
                 }
             }
-            (Ty::Fn(ref arg1, r1), Ty::Fn(ref arg2, r2)) => {
+            (Ty::Fn(arg1, r1), Ty::Fn(arg2, r2)) => {
                 if arg1.len() != arg2.len() {
                     return Err(TypeError::ArgumentSize(a, b));
                 }

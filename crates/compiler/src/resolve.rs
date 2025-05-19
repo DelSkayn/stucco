@@ -79,6 +79,7 @@ pub struct Symbols {
     pub scope_symbols: IdVec<ScopeSymbolId, SymbolId>,
     pub ast_to_resolved: IdVec<NodeId<ast::Symbol>, Option<SymbolId>>,
     pub block_to_scope: IdVec<NodeListId<ast::Expr>, Option<ScopeId>>,
+    pub variation_to_variant: IdVec<NodeId<ast::Variation>, NodeId<ast::Variant>>,
 }
 
 pub fn resolve(root: NodeId<ast::Module>, ast: &Ast) -> Result<Symbols, Error> {
@@ -88,6 +89,7 @@ pub fn resolve(root: NodeId<ast::Module>, ast: &Ast) -> Result<Symbols, Error> {
         scope_symbols: IdVec::new(),
         ast_to_resolved: IdVec::new(),
         block_to_scope: IdVec::new(),
+        variation_to_variant: IdVec::new(),
     };
 
     let mut resolver = Resolver {

@@ -1,14 +1,12 @@
-use object::read::elf::ElfFile64;
-
-use crate::Stencil;
+use object::{LittleEndian, read::elf::ElfFile64};
 
 pub enum ObjErrors {
     InvalidObj(object::read::Error),
 }
 
 /// Extract a stencil from a compiled object file.
-pub fn extract_stencil(object_file_bytes: &[u8]) -> Result<Stencil, ObjErrors> {
-    let _ = ElfFile64::parse(object_file_bytes).map_err(ObjErrors::InvalidObj)?;
+pub fn extract_stencil(object_file_bytes: &[u8]) -> Result<(), ObjErrors> {
+    let _ = ElfFile64::<LittleEndian>::parse(object_file_bytes).map_err(ObjErrors::InvalidObj)?;
 
     todo!()
 }

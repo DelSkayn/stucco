@@ -1,3 +1,7 @@
+use ast::{Ast, NodeId};
+use compiler::{infer::Types, resolve::Symbols};
+use inkwell::{builder::Builder, context::Context, module::Module};
+
 mod obj;
 mod target;
 
@@ -6,42 +10,70 @@ compile_error!(
     "Missing feature on stucco_codegen, either feature stand-alone or feature proc-macro must be enabled"
 );
 
-pub struct StencilSet {
-    stencils: Vec<Stencil>,
+pub struct CodeGen {
+    context: Context,
 }
 
-pub struct Stencil {
-    name: String,
-    variants: Vec<StencilVariant>,
+impl CodeGen {
+    pub fn new() -> Self {
+        let context = Context::create();
+        CodeGen { context }
+    }
+
+    pub fn generate_variation(
+        ast: &Ast,
+        symbols: &Symbols,
+        types: &Types,
+        stencil: NodeId<ast::Stencil>,
+        variation: NodeId<ast::Variation>,
+    ) {
+    }
 }
 
-pub struct StencilVariant {
-    variations: Vec<Variation>,
-    jumps: Vec<StencilJump>,
-    code: Vec<u8>,
+pub struct VariationGen<'ctx, 't> {
+    context: &'ctx Context,
+    module: Module<'ctx>,
+    builder: Builder<'ctx>,
+    ast: &'t Ast,
+    symbols: &'t Symbols,
+    types: &'t Types,
+    id_gen: usize,
 }
 
-pub struct Variation {
-    name: String,
-    kind: VariationKind,
-}
+impl<'ctx, 't> VariationGen<'ctx, 't> {
+    pub fn new(
+        context: &'ctx Context,
+        ast: &'t Ast,
+        symbols: &'t Symbols,
+        types: &'t Types,
+        stencil: NodeId<ast::Stencil>,
+    ) -> Self {
+        let module = context.create_module(
+            &stencil
+                .index(ast)
+                .sym
+                .index(ast)
+                .name
+                .index(ast)
+                .to_string(),
+        );
+        let builder = context.create_builder();
 
-pub enum VariationKind {
-    SlotReg { register: u8 },
-    SlotLoad { offset: u32 },
-    Const { offset: u32, kind: ConstKind },
-}
+        VariationGen {
+            context,
+            ast,
+            symbols,
+            types,
+            module,
+            builder,
+            id_gen: 0,
+        }
+    }
 
-pub enum ConstKind {
-    Clobbered,
-    NonClobbered,
+    pub fn generate_variation(
+        &mut self,
+        stencil: NodeId<ast::Stencil>,
+        variation: NodeId<ast::Variation>,
+    ) {
+    }
 }
-
-pub struct StencilJump {
-    name: String,
-    offset: u32,
-    link: JumpLink,
-    is_fallthrough: bool,
-}
-
-pub enum JumpLink {}

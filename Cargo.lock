@@ -267,6 +267,9 @@ version = "0.1.0"
 dependencies = [
  "inkwell",
  "object",
+ "stucco_ast",
+ "stucco_common",
+ "stucco_compiler",
 ]
 
 [[package]]

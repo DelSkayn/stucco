@@ -1,7 +1,4 @@
-use std::{
-    array,
-    mem::{self, MaybeUninit},
-};
+use std::mem::MaybeUninit;
 
 pub trait IterExt: Iterator {
     /// Collect but for statically sized collections like arrays or tupples.

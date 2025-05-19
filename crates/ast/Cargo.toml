@@ -1,7 +1,7 @@
 [package]
 name = "stucco_ast"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [features]
 print = ["syn/extra-traits"]
@@ -10,5 +10,5 @@ default = ["print"]
 
 [dependencies]
 common = { workspace = true }
-syn = { workspace = true }
+syn = { workspace = true, features = ["parsing","printing"] }
 proc-macro2 = { workspace = true }
