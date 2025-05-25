@@ -11,6 +11,8 @@ pub enum Error {
     RedeclaredFunction(Span),
     RedeclaredVariant(Span),
     RedeclaredParameter { redecl: Span, original: Span },
+    RedeclaredVariation(Span),
+    VariationMissingParameter { variation: Span, parameter: Span },
     Type(TypeError),
     PushNode,
 }
@@ -42,6 +44,12 @@ impl fmt::Display for Error {
             Error::PushNode => {
                 write!(f, "Exceeded node limits")
             }
+            Error::VariationMissingParameter { .. } => {
+                write!(f, "Variation did not contain all parameters")
+            }
+            Error::RedeclaredVariation(_) => {
+                write!(f, "Variation declared twice")
+            }
         }
     }
 }
@@ -72,6 +80,27 @@ impl Error {
                 );
                 format!("{a}\n{b}")
             }
+            Error::VariationMissingParameter {
+                variation,
+                parameter,
+            } => {
+                let a = common::error::render_block(
+                    source,
+                    variation.byte_range(),
+                    "Variation did not contain all parameters",
+                );
+                let b = common::error::render_block(
+                    source,
+                    parameter.byte_range(),
+                    "This parameter was not contained in the variation",
+                );
+                format!("{a}\n{b}")
+            }
+            Error::RedeclaredVariation(s) => common::error::render_block(
+                source,
+                s.byte_range(),
+                "Variation for parameter declared more then once",
+            ),
             Error::Type(_) => {
                 format!("Type error")
             }

@@ -4,10 +4,10 @@ use std::ops::Range;
 use std::{collections::HashMap, u32};
 
 use ast::{
-    visit::{self, Visit},
     Ast, NodeId, NodeListId,
+    visit::{self, Visit},
 };
-use ast::{AstSpanned, Stencil};
+use ast::{AstSpanned, Parameter, Stencil};
 use common::{id, id::IdVec};
 use syn::Ident;
 
@@ -32,12 +32,21 @@ pub enum ScopeKind {
     Function,
 }
 
+bitflags::bitflags! {
+    #[derive(Debug, Eq, PartialEq, Clone,Copy)]
+    struct ScratchFlags: u8{
+        const InVariation = 0x1;
+    }
+
+}
+
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Symbol {
     declared: NodeId<ast::Symbol>,
     shadows: Option<SymbolId>,
     scope: Option<ScopeId>,
     kind: SymbolKind,
+    scratch: ScratchFlags,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -77,9 +86,9 @@ pub struct Symbols {
     pub symbols: IdVec<SymbolId, Symbol>,
     pub scopes: IdVec<ScopeId, Scope>,
     pub scope_symbols: IdVec<ScopeSymbolId, SymbolId>,
-    pub ast_to_resolved: IdVec<NodeId<ast::Symbol>, Option<SymbolId>>,
+    pub ast_to_symbol: IdVec<NodeId<ast::Symbol>, Option<SymbolId>>,
+    pub variation_to_symbol: IdVec<NodeId<ast::Variation>, Option<SymbolId>>,
     pub block_to_scope: IdVec<NodeListId<ast::Expr>, Option<ScopeId>>,
-    pub variation_to_variant: IdVec<NodeId<ast::Variation>, NodeId<ast::Variant>>,
 }
 
 pub fn resolve(root: NodeId<ast::Module>, ast: &Ast) -> Result<Symbols, Error> {
@@ -87,9 +96,9 @@ pub fn resolve(root: NodeId<ast::Module>, ast: &Ast) -> Result<Symbols, Error> {
         symbols: IdVec::new(),
         scopes: IdVec::new(),
         scope_symbols: IdVec::new(),
-        ast_to_resolved: IdVec::new(),
+        ast_to_symbol: IdVec::new(),
         block_to_scope: IdVec::new(),
-        variation_to_variant: IdVec::new(),
+        variation_to_symbol: IdVec::new(),
     };
 
     let mut resolver = Resolver {
@@ -218,7 +227,7 @@ impl Resolver {
         ast: &Ast,
         sym: NodeId<ast::Symbol>,
         kind: SymbolKind,
-    ) -> Result<(), Error> {
+    ) -> Result<SymbolId, Error> {
         let idx = self.symbols.symbols.next_id().ok_or(Error::PushNode)?;
         let shadows = self.active_symbols.insert(ast[sym].name, idx);
 
@@ -227,7 +236,7 @@ impl Resolver {
                 SymbolKind::Module => {}
                 SymbolKind::Stencil => match kind {
                     SymbolKind::Stencil => {
-                        return Err(Error::RedeclaredFunction(sym.ast_span(&ast)))
+                        return Err(Error::RedeclaredFunction(sym.ast_span(&ast)));
                     }
                     SymbolKind::Module
                     | SymbolKind::Parameter
@@ -261,15 +270,16 @@ impl Resolver {
                 shadows,
                 kind,
                 scope: None,
+                scratch: ScratchFlags::empty(),
             })
             .ok_or(Error::PushNode)?;
 
         self.pending_symbols.push(id);
         self.symbols
-            .ast_to_resolved
+            .ast_to_symbol
             .insert_fill(sym, Some(id), || None);
 
-        Ok(())
+        Ok(id)
     }
 }
 
@@ -285,7 +295,8 @@ impl Visit for Resolver {
             SymbolKind::Local
         };
 
-        self.declare_symbol(ast, ast[f].sym, kind)
+        self.declare_symbol(ast, ast[f].sym, kind)?;
+        Ok(())
     }
 
     fn visit_become(&mut self, ast: &Ast, t: NodeId<ast::Become>) -> Result<(), Self::Error> {
@@ -317,7 +328,7 @@ impl Visit for Resolver {
         };
 
         self.symbols
-            .ast_to_resolved
+            .ast_to_symbol
             .insert_fill(sym, Some(*s), || None);
 
         Ok(())
@@ -332,13 +343,47 @@ impl Visit for Resolver {
         let next_scope = self.pending_scopes.len();
         let next_symbol = self.pending_symbols.len();
 
-        visit::visit_stencil(self, ast, f)?;
+        for param in ast.iter_list_node(ast[f].parameters) {
+            self.declare_symbol(ast, ast[param].sym, SymbolKind::Parameter);
+        }
+        for var in ast.iter_list_node(ast[f].variants) {
+            // resolve the variant
+            for variation in ast.iter_list_node(ast[var].variations) {
+                let sym = match ast[variation] {
+                    ast::Variation::Constant(node_id) => ast[node_id].sym,
+                    ast::Variation::Slot(node_id) => ast[node_id].sym,
+                };
+                self.visit_symbol(ast, sym)?;
+                let symbol_id = self.symbols.ast_to_symbol[sym].unwrap();
+                if self.symbols.symbols[symbol_id]
+                    .scratch
+                    .contains(ScratchFlags::InVariation)
+                {
+                    return Err(Error::RedeclaredVariation(ast[sym].span));
+                }
+                self.symbols.symbols[symbol_id].scratch |= ScratchFlags::InVariation;
+            }
+            // ensure a variant contains all parameters.
+            for param in ast.iter_list_node(ast[f].parameters) {
+                let symbol_id = self.symbols.ast_to_symbol[ast[param].sym].unwrap();
+                if !self.symbols.symbols[symbol_id]
+                    .scratch
+                    .contains(ScratchFlags::InVariation)
+                {
+                    return Err(Error::VariationMissingParameter {
+                        variation: ast[var].span,
+                        parameter: ast[param].span,
+                    });
+                }
+                self.symbols.symbols[symbol_id]
+                    .scratch
+                    .remove(ScratchFlags::InVariation);
+            }
+        }
+
+        visit::visit_expr(self, ast, ast[f].body)?;
 
         self.finish_scope(ast, next_scope, next_symbol)
-    }
-
-    fn visit_parameter(&mut self, ast: &Ast, p: NodeId<ast::Parameter>) -> Result<(), Self::Error> {
-        self.declare_symbol(ast, ast[p].sym, SymbolKind::Parameter)
     }
 
     fn visit_inner_block(

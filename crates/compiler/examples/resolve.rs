@@ -1,6 +1,6 @@
 use ast::{
-    visit::{self, Visit},
     Ast, AstSpanned as _,
+    visit::{self, Visit},
 };
 use common::{
     error,
@@ -8,9 +8,9 @@ use common::{
     render::{self, IndentFormatter},
 };
 use core::fmt;
-use parser::{parse_external_module, Parser};
+use parser::{Parser, parse_external_module};
 use std::{env, error::Error, fmt::Write as _, io::Read};
-use stucco_compiler::resolve::{resolve, Symbols};
+use stucco_compiler::resolve::{Symbols, resolve};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let src = if let Some(arg) = env::args().skip(1).next() {
@@ -105,7 +105,7 @@ where
     fn visit_symbol(&mut self, ast: &Ast, f: ast::NodeId<ast::Symbol>) -> Result<(), Self::Error> {
         let line = error::render_line(self.source, f.ast_span(ast).byte_range());
         write!(self.fmt, "{} @ '{}'", ast[f].name.index(&ast), line.trim())?;
-        if let Some(x) = self.symbols.ast_to_resolved.get(f).copied().and_then(|x| x) {
+        if let Some(x) = self.symbols.ast_to_symbol.get(f).copied().and_then(|x| x) {
             writeln!(self.fmt, " = [{:?}]", x.idx())
         } else {
             writeln!(self.fmt, " = NOT RESOLVED")

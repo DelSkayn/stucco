@@ -531,7 +531,7 @@ impl<'a> Visit for InferUpPass<'a> {
     ) -> Result<(), Self::Error> {
         for p in ast.iter_list_node(ast[m].parameters) {
             let ty = self.type_from_ast(ast, ast[p].ty)?;
-            let sym_id = self.symbols.ast_to_resolved[ast[p].sym].expect("unresolved symbol");
+            let sym_id = self.symbols.ast_to_symbol[ast[p].sym].expect("unresolved symbol");
             self.ty.symbol_to_type.insert_fill_default(sym_id, Some(ty));
         }
 
@@ -662,7 +662,7 @@ impl<'a> Visit for InferUpPass<'a> {
             ast::Expr::Let(n) => {
                 // TODO: Type declarations
                 let expr = ast[n].expr;
-                let symbol = self.symbols.ast_to_resolved[ast[n].sym].unwrap();
+                let symbol = self.symbols.ast_to_symbol[ast[n].sym].unwrap();
                 self.visit_let(ast, n)?;
                 if let Some(x) = self.ty.symbol_to_type.get(symbol).copied().flatten() {
                     self.ty.unify(x, self.ty.expr_to_type[expr].unwrap())?;
@@ -771,7 +771,7 @@ impl<'a> Visit for InferUpPass<'a> {
                 }
             }
             ast::Expr::Symbol(node_id) => {
-                let symbol = self.symbols.ast_to_resolved[node_id].unwrap();
+                let symbol = self.symbols.ast_to_symbol[node_id].unwrap();
                 let ty_id = self
                     .ty
                     .symbol_to_type
