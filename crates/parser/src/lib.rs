@@ -1,14 +1,14 @@
 use ast::{Ast, AstSpanned, Node, NodeId, NodeListId, Span, Spanned};
-use proc_macro2::{extra::DelimSpan, Delimiter, TokenStream};
+use proc_macro2::{Delimiter, TokenStream, extra::DelimSpan};
 use std::{
     fmt,
     ops::{Deref, DerefMut},
 };
 use syn::{
-    parse::{
-        discouraged::AnyDelimiter, Parse as SynParse, ParseBuffer, ParseStream, Parser as _, Peek,
-    },
     Result, Token,
+    parse::{
+        Parse as SynParse, ParseBuffer, ParseStream, Parser as _, Peek, discouraged::AnyDelimiter,
+    },
 };
 
 pub mod error;
@@ -252,7 +252,7 @@ pub fn parse_wrapped_module(parser: &mut Parser) -> Result<NodeId<ast::Module>> 
 
     Ok(parser.push(ast::Module {
         sym: Some(sym),
-        functions,
+        stencils: functions,
         span,
     })?)
 }
@@ -281,7 +281,7 @@ pub fn parse_external_module(parser: &mut Parser) -> Result<NodeId<ast::Module>>
 
     Ok(parser.push(ast::Module {
         sym: None,
-        functions: head,
+        stencils: head,
         span,
     })?)
 }

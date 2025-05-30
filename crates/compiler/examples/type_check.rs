@@ -1,17 +1,17 @@
 use ast::{
-    visit::{self, Visit},
     Ast, AstSpanned as _,
+    visit::{self, Visit},
 };
 use common::{
     error,
     render::{self, IndentFormatter},
 };
 use core::fmt;
-use parser::{parse_external_module, Parser};
+use parser::{Parser, parse_external_module};
 use std::{env, error::Error, fmt::Write as _, io::Read};
 use stucco_compiler::{
     infer::{self, TypeError, Types},
-    resolve::{resolve, Symbols},
+    resolve::{Symbols, resolve},
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -55,6 +55,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                         "Unexpected type {}, expected {}",
                         types.type_to_string(a),
                         types.type_to_string(b)
+                    )
+                }
+                TypeError::LiteralOverflow(lit, ty) => {
+                    eprintln!(
+                        "Can't fit '{:?}' in type {}",
+                        ast[lit].span().source_text(),
+                        types.type_to_string(ty)
                     )
                 }
                 _ => {}

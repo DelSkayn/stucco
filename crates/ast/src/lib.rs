@@ -4,8 +4,8 @@ pub mod visit;
 pub use ast::Node;
 use ast::NodeLibrary;
 pub use ast::{AstSpanned, NodeId, NodeList, NodeListId, PushNodeError, Span, Spanned};
-use common::{id::IdSet, thinvec::ThinVec};
-use syn::{Ident, Lit};
+use common::id::IdSet;
+pub use syn::{Ident, Lit};
 
 #[cfg(feature = "print")]
 pub use ast::{AstDisplay, AstFormatter, AstRender};
@@ -13,56 +13,56 @@ pub use ast::{AstDisplay, AstFormatter, AstRender};
 type LibrarySet<T> = IdSet<u32, T>;
 
 library!(Library {
-    module: ThinVec<Module>,
+    module: Vec<Module>,
 
-    stencil_function: ThinVec<Stencil>,
-    stencil_functions: ThinVec<NodeList<Stencil>>,
+    stencil_function: Vec<Stencil>,
+    stencil_functions: Vec<NodeList<Stencil>>,
 
-    variant: ThinVec<Variant>,
-    variants: ThinVec<NodeList<Variant>>,
+    variant: Vec<Variant>,
+    variants: Vec<NodeList<Variant>>,
 
-    variation: ThinVec<Variation>,
-    variations: ThinVec<NodeList<Variation>>,
+    variation: Vec<Variation>,
+    variations: Vec<NodeList<Variation>>,
 
-    variation_slot: ThinVec<VariationSlot>,
-    variation_constant: ThinVec<VariationConstant>,
+    variation_slot: Vec<VariationSlot>,
+    variation_constant: Vec<VariationConstant>,
 
-    parameter: ThinVec<Parameter>,
-    parameters: ThinVec<NodeList<Parameter>>,
+    parameter: Vec<Parameter>,
+    parameters: Vec<NodeList<Parameter>>,
 
-    expr: ThinVec<Expr>,
-    exprs: ThinVec<NodeList<Expr>>,
-    binary: ThinVec<BinaryExpr>,
-    unary: ThinVec<UnaryExpr>,
-    if_: ThinVec<If>,
-    while_: ThinVec<While>,
-    block: ThinVec<Block>,
+    expr: Vec<Expr>,
+    exprs: Vec<NodeList<Expr>>,
+    binary: Vec<BinaryExpr>,
+    unary: Vec<UnaryExpr>,
+    if_: Vec<If>,
+    while_: Vec<While>,
+    block: Vec<Block>,
 
-    literal: ThinVec<Lit>,
+    literal: Vec<Lit>,
 
-    let_: ThinVec<Let>,
+    let_: Vec<Let>,
 
-    method: ThinVec<Method>,
-    call: ThinVec<Call>,
-    field: ThinVec<Field>,
-    index: ThinVec<Index>,
+    method: Vec<Method>,
+    call: Vec<Call>,
+    field: Vec<Field>,
+    index: Vec<Index>,
 
-    break_: ThinVec<Break>,
-    return_: ThinVec<Return>,
-    tail: ThinVec<Become>,
+    break_: Vec<Break>,
+    return_: Vec<Return>,
+    tail: Vec<Become>,
 
-    type_: ThinVec<Type>,
-    types: ThinVec<NodeList<Type>>,
-    type_fn: ThinVec<TypeFn>,
-    type_array: ThinVec<TypeArray>,
-    type_tuple: ThinVec<TypeTuple>,
-    type_ptr: ThinVec<TypePtr>,
-    type_reference: ThinVec<TypeReference>,
+    type_: Vec<Type>,
+    types: Vec<NodeList<Type>>,
+    type_fn: Vec<TypeFn>,
+    type_array: Vec<TypeArray>,
+    type_tuple: Vec<TypeTuple>,
+    type_ptr: Vec<TypePtr>,
+    type_reference: Vec<TypeReference>,
 
-    arg: ThinVec<Arg>,
-    args: ThinVec<NodeList<Arg>>,
+    arg: Vec<Arg>,
+    args: Vec<NodeList<Arg>>,
 
-    symbol: ThinVec<Symbol>,
+    symbol: Vec<Symbol>,
 
     ident: LibrarySet<Ident>,
 });
@@ -305,7 +305,7 @@ ast_struct! {
     pub struct Module {
         // Can be None when the module is reference externally.
         pub sym: Option<NodeId<Symbol>>,
-        pub functions: Option<NodeListId<Stencil>>,
+        pub stencils: Option<NodeListId<Stencil>>,
     }
 }
 

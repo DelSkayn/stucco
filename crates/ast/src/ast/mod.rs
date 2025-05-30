@@ -281,6 +281,10 @@ where
 
         Some(v)
     }
+
+    pub fn library(&self) -> &L {
+        &self.library
+    }
 }
 
 pub struct ListIter<'a, L, T> {
@@ -461,7 +465,7 @@ macro_rules! library {
         $(#[$m])*
         pub struct $name{
             $(
-                $field: $container<$( $ty ),*>
+                pub $field: $container<$( $ty ),*>
             ),*
         }
 

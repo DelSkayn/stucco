@@ -47,7 +47,7 @@ macro_rules! implement_visitor{
 
 implement_visitor! {
     fn visit_module(visit, ast, m: NodeId<Module>) -> Result{
-        let mut cur = ast[m].functions;
+        let mut cur = ast[m].stencils;
         while let Some(f) = ast.next_list(&mut cur) {
             visit.visit_stencil(ast, f)?
         }

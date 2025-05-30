@@ -18,3 +18,7 @@ compiler.workspace = true
 inkwell = { version = "0.6.0", features = ["llvm18-1"] }
 # Object file parsing
 object = "0.36.2"
+
+
+[dev-dependencies]
+parser = { workspace = true }

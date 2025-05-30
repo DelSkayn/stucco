@@ -6,7 +6,11 @@ use ast::{
     Ast, Block, Expr, Method, NodeId, Span,
     visit::{self, Visit},
 };
-use common::{id, id::IdVec, iter::IterExt};
+use common::{
+    id,
+    id::{Id, IdVec},
+    iter::IterExt,
+};
 use syn::Ident;
 
 id!(TyId);
@@ -24,9 +28,11 @@ pub enum TypeError {
     UnknownMethod(Ident, TyId),
     InvalidArity(NodeId<Method>, usize),
     UnknownType(NodeId<ast::Type>),
+    LiteralOverflow(NodeId<ast::Lit>, TyId),
+    CantInfer(TyId),
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum PrimTy {
     Nil,
     Bool,
@@ -98,6 +104,11 @@ impl Types {
         res.init();
 
         res
+    }
+
+    pub fn find_type_for_expr(&self, n: NodeId<ast::Expr>) -> Option<TyId> {
+        let ty = self.expr_to_type.get(n).copied()??;
+        Some(self.find_type(ty))
     }
 
     pub fn find_type(&self, mut ty: TyId) -> TyId {
@@ -219,6 +230,8 @@ impl Types {
             loop_block_stack: Vec::new(),
         };
         pass.visit_module(ast, root)?;
+        self.validate(ast)?;
+
         Ok(())
     }
 
@@ -227,6 +240,90 @@ impl Types {
         let mut type_name = 0;
         self.type_to_string_rec(ty, &mut buf, &mut type_name);
         buf
+    }
+
+    // Validates if all the types are properly infered
+    fn validate(&self, ast: &Ast) -> Result<(), TypeError> {
+        for (idx, expr) in ast.library().expr.iter().enumerate() {
+            let id = NodeId::<ast::Expr>::from_idx(idx).unwrap();
+            let ty = self.find_type_for_expr(id).unwrap();
+            if matches!(self.type_graph[ty], Ty::Var(..)) {
+                return Err(TypeError::CantInfer(ty));
+            }
+
+            if let Expr::Literal(l) = expr {
+                let Ty::Prim(p) = self.type_graph[ty] else {
+                    panic!(
+                        "Literal does not have a primitive type: {:?}",
+                        self.type_graph[ty]
+                    )
+                };
+                match ast[*l] {
+                    syn::Lit::Int(ref lit_int) => match p {
+                        PrimTy::U64 | PrimTy::Usize => {
+                            if lit_int.base10_digits().parse::<u64>().is_err() {
+                                return Err(TypeError::LiteralOverflow(*l, ty));
+                            }
+                        }
+                        PrimTy::Isize | PrimTy::I64 => {
+                            if lit_int.base10_digits().parse::<i64>().is_err() {
+                                return Err(TypeError::LiteralOverflow(*l, ty));
+                            }
+                        }
+                        PrimTy::U32 => {
+                            if lit_int.base10_digits().parse::<u32>().is_err() {
+                                return Err(TypeError::LiteralOverflow(*l, ty));
+                            }
+                        }
+                        PrimTy::I32 => {
+                            if lit_int.base10_digits().parse::<i32>().is_err() {
+                                return Err(TypeError::LiteralOverflow(*l, ty));
+                            }
+                        }
+                        PrimTy::U16 => {
+                            if lit_int.base10_digits().parse::<u16>().is_err() {
+                                return Err(TypeError::LiteralOverflow(*l, ty));
+                            }
+                        }
+                        PrimTy::I16 => {
+                            if lit_int.base10_digits().parse::<i16>().is_err() {
+                                return Err(TypeError::LiteralOverflow(*l, ty));
+                            }
+                        }
+                        PrimTy::U8 => {
+                            if lit_int.base10_digits().parse::<u8>().is_err() {
+                                return Err(TypeError::LiteralOverflow(*l, ty));
+                            }
+                        }
+                        PrimTy::I8 => {
+                            if lit_int.base10_digits().parse::<i8>().is_err() {
+                                return Err(TypeError::LiteralOverflow(*l, ty));
+                            }
+                        }
+                        x => panic!("int literal not an int: {x:?}"),
+                    },
+                    syn::Lit::Float(ref lit_float) => match p {
+                        PrimTy::F64 => {
+                            if lit_float.base10_digits().parse::<f64>().is_err() {
+                                return Err(TypeError::LiteralOverflow(*l, ty));
+                            }
+                        }
+                        PrimTy::F32 => {
+                            if lit_float.base10_digits().parse::<f32>().is_err() {
+                                return Err(TypeError::LiteralOverflow(*l, ty));
+                            }
+                        }
+                        _ => panic!(),
+                    },
+                    _ => return Ok(()),
+                }
+            } else {
+                if let Ty::Var(_, _) = self.type_graph[ty] {
+                    return Err(TypeError::CantInfer(ty));
+                }
+            }
+        }
+        Ok(())
     }
 
     fn type_to_string_rec(&self, ty: TyId, buf: &mut String, type_name: &mut usize) {

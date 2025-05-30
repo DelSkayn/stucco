@@ -276,6 +276,7 @@ dependencies = [
  "stucco_ast",
  "stucco_common",
  "stucco_compiler",
+ "stucco_parser",
 ]
 
 [[package]]

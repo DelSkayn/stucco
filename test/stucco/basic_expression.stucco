@@ -1,15 +1,6 @@
-mod test{
-    stencil add(a: usize, b: usize)
+    stencil add()
         variant
-            slot a,
-            const b,
     {
-        loop{
-            if true {
-                break 1
-            }else{
-                break 2u64
-            }
-        }
+        let t = 1 + 1i64;
+        become next(t)
     }
-}

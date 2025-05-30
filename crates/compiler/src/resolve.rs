@@ -7,7 +7,7 @@ use ast::{
     Ast, NodeId, NodeListId,
     visit::{self, Visit},
 };
-use ast::{AstSpanned, Parameter, Stencil};
+use ast::{AstSpanned, Stencil};
 use common::{id, id::IdVec};
 use syn::Ident;
 
@@ -87,7 +87,6 @@ pub struct Symbols {
     pub scopes: IdVec<ScopeId, Scope>,
     pub scope_symbols: IdVec<ScopeSymbolId, SymbolId>,
     pub ast_to_symbol: IdVec<NodeId<ast::Symbol>, Option<SymbolId>>,
-    pub variation_to_symbol: IdVec<NodeId<ast::Variation>, Option<SymbolId>>,
     pub block_to_scope: IdVec<NodeListId<ast::Expr>, Option<ScopeId>>,
 }
 
@@ -98,7 +97,6 @@ pub fn resolve(root: NodeId<ast::Module>, ast: &Ast) -> Result<Symbols, Error> {
         scope_symbols: IdVec::new(),
         ast_to_symbol: IdVec::new(),
         block_to_scope: IdVec::new(),
-        variation_to_symbol: IdVec::new(),
     };
 
     let mut resolver = Resolver {
@@ -344,8 +342,12 @@ impl Visit for Resolver {
         let next_symbol = self.pending_symbols.len();
 
         for param in ast.iter_list_node(ast[f].parameters) {
-            self.declare_symbol(ast, ast[param].sym, SymbolKind::Parameter);
+            self.declare_symbol(ast, ast[param].sym, SymbolKind::Parameter)?;
         }
+        // Resolve variations
+        //
+        // Ensures both that variations are defining all parameters, and that they are not
+        // duplicated.
         for var in ast.iter_list_node(ast[f].variants) {
             // resolve the variant
             for variation in ast.iter_list_node(ast[var].variations) {
@@ -363,6 +365,7 @@ impl Visit for Resolver {
                 }
                 self.symbols.symbols[symbol_id].scratch |= ScratchFlags::InVariation;
             }
+
             // ensure a variant contains all parameters.
             for param in ast.iter_list_node(ast[f].parameters) {
                 let symbol_id = self.symbols.ast_to_symbol[ast[param].sym].unwrap();
