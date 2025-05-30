@@ -58,13 +58,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let code_gen = CodeGen::new();
+    let code_gen = CodeGen::new(&ast, &symbols, &types, Default::default());
 
     for stencil in ast.iter_list_node(ast[node].stencils) {
         for var in ast.iter_list_node(ast[stencil].variants) {
-            let variation = code_gen.generate_variation(&ast, &symbols, &types, stencil);
-            let llvm_str = variation.generate_variation(stencil, var).print_to_string();
-            let str = llvm_str.to_string_lossy();
+            let module = code_gen.generate_variation(stencil, var).into_module();
+            let str = module.print_to_string().to_string_lossy().into_owned();
             println!("{str}")
         }
     }

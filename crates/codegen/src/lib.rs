@@ -10,8 +10,8 @@ use inkwell::{
     builder::Builder,
     context::Context,
     llvm_sys::LLVMCallConv,
-    module::Module,
-    types::{AnyType, AnyTypeEnum, BasicMetadataTypeEnum, BasicType},
+    module::{self, Linkage, Module},
+    types::{self, AnyType, AnyTypeEnum, BasicMetadataTypeEnum, BasicType},
     values::LLVMTailCallKind,
 };
 use util::{NonBasicTypeEnum, try_any_to_basic};
@@ -27,8 +27,24 @@ compile_error!(
     "Missing feature on stucco_codegen, either feature stand-alone or feature proc-macro must be enabled"
 );
 
-pub struct CodeGen {
+pub struct Config {
+    pub num_passing_register: usize,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            num_passing_register: 8,
+        }
+    }
+}
+
+pub struct CodeGen<'t> {
     context: Context,
+    ast: &'t Ast,
+    symbols: &'t Symbols,
+    types: &'t Types,
+    config: Config,
 }
 
 enum NumberType {
@@ -55,20 +71,24 @@ impl NumberType {
     }
 }
 
-impl CodeGen {
-    pub fn new() -> Self {
+impl<'t> CodeGen<'t> {
+    pub fn new(ast: &'t Ast, symbols: &'t Symbols, types: &'t Types, config: Config) -> Self {
         let context = Context::create();
-        CodeGen { context }
+        CodeGen {
+            context,
+            ast,
+            symbols,
+            types,
+            config,
+        }
     }
 
-    pub fn generate_variation<'ctx, 't>(
+    pub fn generate_variation<'ctx>(
         &'ctx self,
-        ast: &'t Ast,
-        symbols: &'t Symbols,
-        types: &'t Types,
         stencil: NodeId<ast::Stencil>,
+        variant: NodeId<ast::Variant>,
     ) -> VariationGen<'ctx, 't> {
-        VariationGen::new(&self.context, ast, symbols, types, stencil)
+        VariationGen::build(&self, stencil, variant)
     }
 }
 
@@ -88,32 +108,37 @@ impl NameGen {
     pub fn name(&mut self, prefix: &str) -> &str {
         self.buffer.clear();
         self.buffer.push_str(prefix);
-        writeln!(&mut self.buffer, "{}", self.id);
+        writeln!(&mut self.buffer, "{}", self.id).unwrap();
         self.id += 1;
         &self.buffer
     }
 }
 
+pub struct VariationData {
+    symbol: SymbolId,
+}
+
 pub struct VariationGen<'ctx, 't> {
+    config: &'ctx Config,
     context: &'ctx Context,
-    module: Module<'ctx>,
-    builder: Builder<'ctx>,
     ast: &'t Ast,
     symbols: &'t Symbols,
     types: &'t Types,
+    module: Module<'ctx>,
+    builder: Builder<'ctx>,
     symbol_value: HashMap<SymbolId, Value<'ctx>>,
+    //variation_data: HashMap<NodeId<ast::Variation>, Value<'ctx>>,
     name_gen: NameGen,
 }
 
 impl<'ctx, 't> VariationGen<'ctx, 't> {
-    pub fn new(
-        context: &'ctx Context,
-        ast: &'t Ast,
-        symbols: &'t Symbols,
-        types: &'t Types,
+    pub fn build(
+        cgen: &'ctx CodeGen<'t>,
         stencil: NodeId<ast::Stencil>,
+        variant: NodeId<ast::Variant>,
     ) -> Self {
-        let module = context.create_module(
+        let ast = &cgen.ast;
+        let module = cgen.context.create_module(
             &stencil
                 .index(ast)
                 .sym
@@ -122,18 +147,27 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
                 .index(ast)
                 .to_string(),
         );
-        let builder = context.create_builder();
+        let builder = cgen.context.create_builder();
 
-        VariationGen {
-            context,
-            ast,
-            symbols,
-            types,
+        let mut res = VariationGen {
+            config: &cgen.config,
+            context: &cgen.context,
+            ast: cgen.ast,
+            symbols: cgen.symbols,
+            types: cgen.types,
             module,
             builder,
             symbol_value: HashMap::new(),
             name_gen: NameGen::new(),
-        }
+        };
+
+        res.generate_variation(stencil, variant);
+
+        res
+    }
+
+    pub fn into_module(self) -> Module<'ctx> {
+        self.module
     }
 
     fn tyid_to_llvm_type(&self, id: TyId) -> AnyTypeEnum<'ctx> {
@@ -199,10 +233,10 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
     }
 
     pub fn generate_variation(
-        mut self,
+        &mut self,
         stencil: NodeId<ast::Stencil>,
         variant: NodeId<ast::Variant>,
-    ) -> Module<'ctx> {
+    ) {
         for p in self.ast.iter_list_node(self.ast[stencil].parameters) {
             let sym = self.symbols.ast_to_symbol[self.ast[p].sym].expect("symbol not resolved");
             let variation = self
@@ -224,9 +258,36 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
             }
         }
 
-        self.gen_expr(self.ast[stencil].body);
+        let args_ty: Vec<_> = (0..self.config.num_passing_register)
+            .map(|_| self.context.i64_type().into())
+            .collect();
+        let ty = self.context.void_type().fn_type(&args_ty, false);
 
-        self.module
+        let function = self.module.add_function("__stencil__", ty, None);
+        function.set_call_conventions(LLVMCallConv::LLVMGHCCallConv as u32);
+
+        let bb = self.context.append_basic_block(function, "entry");
+        self.builder.position_at_end(bb);
+
+        self.gen_expr(self.ast[stencil].body);
+    }
+
+    /// Add an immediate for a variation.
+    fn compile_immediate(&mut self, immediate: NodeId<ast::VariationConstant>) {
+        let global = self.module.add_global(
+            self.context.i8_type(),
+            None,
+            &format!(
+                "__immediate_{}",
+                &immediate
+                    .index(self.ast)
+                    .sym
+                    .index(self.ast)
+                    .name
+                    .index(self.ast)
+            ),
+        );
+        global.set_linkage(Linkage::External);
     }
 
     fn gen_expr(&mut self, expr: NodeId<ast::Expr>) -> Value<'ctx> {
