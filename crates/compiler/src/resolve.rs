@@ -352,7 +352,7 @@ impl Visit for Resolver {
             // resolve the variant
             for variation in ast.iter_list_node(ast[var].variations) {
                 let sym = match ast[variation] {
-                    ast::Variation::Constant(node_id) => ast[node_id].sym,
+                    ast::Variation::Immediate(node_id) => ast[node_id].sym,
                     ast::Variation::Slot(node_id) => ast[node_id].sym,
                 };
                 self.visit_symbol(ast, sym)?;

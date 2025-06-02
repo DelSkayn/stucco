@@ -1,18 +1,9 @@
-use ast::{
-    Ast, AstSpanned as _,
-    visit::{self, Visit},
-};
-use common::{
-    error,
-    render::{self, IndentFormatter},
-};
 use compiler::{
-    infer::{self, TypeError, Types},
-    resolve::{Symbols, resolve},
+    infer::{TypeError, Types},
+    resolve::resolve,
 };
-use core::fmt;
 use parser::{Parser, parse_external_module};
-use std::{env, error::Error, fmt::Write as _, io::Read};
+use std::{env, error::Error, io::Read};
 use stucco_codegen::CodeGen;
 
 fn main() -> Result<(), Box<dyn Error>> {

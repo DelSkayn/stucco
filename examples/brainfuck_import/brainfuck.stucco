@@ -1,6 +1,6 @@
 stencil next(stack: *mut usize, count: usize)
     variant
-        const count,
+        imm count,
         slot stack,
 {
     let stack = stack.add(count);
@@ -9,7 +9,7 @@ stencil next(stack: *mut usize, count: usize)
     
 stencil previous(stack: *mut usize, count: usize)
     variant
-        const count,
+        imm count,
         slot stack,
 {
     let stack = stack.sub(count);
@@ -18,7 +18,7 @@ stencil previous(stack: *mut usize, count: usize)
 
 stencil increment(stack: *mut usize, by: usize)
     variant
-        const by,
+        imm by,
         slot stack,
 {
     stack.write(stack.read() + by);
@@ -27,7 +27,7 @@ stencil increment(stack: *mut usize, by: usize)
 
 stencil decrement(stack: *mut usize, by: usize)
     variant
-        const by,
+        imm by,
         slot stack,
 {
     stack.write(stack.read() - by);
@@ -36,7 +36,7 @@ stencil decrement(stack: *mut usize, by: usize)
 
 stencil put(stack: *mut usize, write: fn(usize))
     variant
-        const write,
+        imm write,
         slot stack,
 {
     write(stack.read());
@@ -46,7 +46,7 @@ stencil put(stack: *mut usize, write: fn(usize))
 
 stencil gets(stack: *mut usize, read: fn() -> usize)
     variant
-        const read,
+        imm read,
         slot stack,
 {
     stack.write(read());

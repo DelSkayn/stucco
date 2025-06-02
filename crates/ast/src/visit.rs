@@ -1,7 +1,7 @@
 use crate::{
     Become, BinaryExpr, Block, Break, Call, Cast, Expr, Field, If, Index, Let, Method, Module,
     NodeId, NodeListId, Parameter, Return, Span, Stencil, Symbol, Type, TypeArray, TypeFn, TypePtr,
-    TypeReference, TypeTuple, UnaryExpr, Variant, Variation, VariationConstant, VariationSlot,
+    TypeReference, TypeTuple, UnaryExpr, Variant, Variation, VariationImmediate, VariationSlot,
     While,
 };
 use syn::{Ident, Lit};
@@ -88,12 +88,12 @@ implement_visitor! {
 
     fn visit_variation(visit, ast, m: NodeId<Variation>) -> Result{
         match ast[m] {
-            Variation::Constant(node_id) => visit.visit_variation_constant(ast,node_id),
+            Variation::Immediate(node_id) => visit.visit_variation_immediate(ast,node_id),
             Variation::Slot(node_id) => visit.visit_variation_slot(ast,node_id),
         }
     }
 
-    fn visit_variation_constant(visit,ast,m: NodeId<VariationConstant>) -> Result{
+    fn visit_variation_immediate(visit,ast,m: NodeId<VariationImmediate>) -> Result{
         visit.visit_symbol(ast, ast[m].sym)
     }
 

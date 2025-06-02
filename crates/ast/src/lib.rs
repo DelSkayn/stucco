@@ -25,7 +25,7 @@ library!(Library {
     variations: Vec<NodeList<Variation>>,
 
     variation_slot: Vec<VariationSlot>,
-    variation_constant: Vec<VariationConstant>,
+    variation_constant: Vec<VariationImmediate>,
 
     parameter: Vec<Parameter>,
     parameters: Vec<NodeList<Parameter>>,
@@ -328,13 +328,13 @@ ast_struct! {
 
 ast_enum! {
     pub enum Variation {
-        Constant(NodeId<VariationConstant>),
+        Immediate(NodeId<VariationImmediate>),
         Slot(NodeId<VariationSlot>),
     }
 }
 
 ast_struct! {
-    pub struct VariationConstant {
+    pub struct VariationImmediate {
         pub sym: NodeId<Symbol>,
     }
 }

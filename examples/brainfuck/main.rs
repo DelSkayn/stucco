@@ -1,7 +1,7 @@
 stucco::module!(mod brainfuck {
     stencil next(stack: *mut usize, count: usize)
         variant
-            const count,
+            imm count,
             slot stack,
     {
         let stack = stack.add(COUNT);
@@ -10,7 +10,7 @@ stucco::module!(mod brainfuck {
 
     stencil previous(stack: *mut usize, count: usize)
         variant
-            const count,
+            imm count,
             slot stack,
     {
         let stack = stack.sub(COUNT);
@@ -19,7 +19,7 @@ stucco::module!(mod brainfuck {
 
     stencil increment(stack: *mut usize, by: usize)
         variant
-            const by,
+            imm by,
             slot stack,
     {
         stack.write(stack.read() + by);
@@ -28,7 +28,7 @@ stucco::module!(mod brainfuck {
 
     stencil decrement(stack: *mut usize, by: usize)
         variant
-            const by,
+            imm by,
             slot stack,
     {
         stack.write(stack.read() - by);
@@ -37,7 +37,7 @@ stucco::module!(mod brainfuck {
 
     stencil put(stack: *mut usize, write: fn(usize))
         variant
-        const write,
+        imm write,
         slot stack,
     {
         write(stack.read());
@@ -47,7 +47,7 @@ stucco::module!(mod brainfuck {
 
     stencil gets(stack: *mut usize, read: fn() -> usize)
         variant
-        const read,
+        imm read,
         slot stack,
     {
         stack.write(read());

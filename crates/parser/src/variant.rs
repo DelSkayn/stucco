@@ -1,7 +1,7 @@
-use ast::{NodeId, Spanned as _, Variant, Variation, VariationConstant, VariationSlot};
+use ast::{NodeId, Spanned as _, Variant, Variation, VariationImmediate, VariationSlot};
 use syn::{Result, Token};
 
-use crate::{kw, Parse, Parser};
+use crate::{Parse, Parser, kw};
 
 impl Parse for ast::Variant {
     fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
@@ -14,7 +14,7 @@ impl Parse for ast::Variant {
                 Variation::Slot(v)
             } else if parser.peek(Token![const]) {
                 let v = parser.parse()?;
-                Variation::Constant(v)
+                Variation::Immediate(v)
             } else {
                 break;
             };
@@ -43,10 +43,10 @@ impl Parse for ast::VariationSlot {
     }
 }
 
-impl Parse for ast::VariationConstant {
+impl Parse for ast::VariationImmediate {
     fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
-        let span = parser.parse_syn::<Token![const]>()?.span();
+        let span = parser.parse_syn::<kw::imm>()?.span();
         let sym = parser.parse()?;
-        parser.push(VariationConstant { span, sym })
+        parser.push(VariationImmediate { span, sym })
     }
 }

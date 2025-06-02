@@ -10,8 +10,8 @@ use inkwell::{
     builder::Builder,
     context::Context,
     llvm_sys::LLVMCallConv,
-    module::{self, Linkage, Module},
-    types::{self, AnyType, AnyTypeEnum, BasicMetadataTypeEnum, BasicType},
+    module::{Linkage, Module},
+    types::{AnyType, AnyTypeEnum, BasicMetadataTypeEnum, BasicType},
     values::LLVMTailCallKind,
 };
 use util::{NonBasicTypeEnum, try_any_to_basic};
@@ -112,10 +112,6 @@ impl NameGen {
         self.id += 1;
         &self.buffer
     }
-}
-
-pub struct VariationData {
-    symbol: SymbolId,
 }
 
 pub struct VariationGen<'ctx, 't> {
@@ -237,13 +233,16 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
         stencil: NodeId<ast::Stencil>,
         variant: NodeId<ast::Variant>,
     ) {
+        let mut slots = Vec::new();
+        let mut immediate = Vec::new();
+
         for p in self.ast.iter_list_node(self.ast[stencil].parameters) {
             let sym = self.symbols.ast_to_symbol[self.ast[p].sym].expect("symbol not resolved");
             let variation = self
                 .ast
                 .iter_list_node(self.ast[variant].variations)
                 .find(|x| match self.ast[*x] {
-                    ast::Variation::Constant(n) => {
+                    ast::Variation::Immediate(n) => {
                         self.symbols.ast_to_symbol[self.ast[n].sym].unwrap() == sym
                     }
                     ast::Variation::Slot(n) => {
@@ -253,8 +252,12 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
                 .expect("variation not resolved");
 
             match self.ast[variation] {
-                ast::Variation::Constant(_) => {}
-                ast::Variation::Slot(_) => {}
+                ast::Variation::Immediate(v) => {
+                    immediate.push(v);
+
+                }
+                ast::Variation::Slot(v) => {
+                }
             }
         }
 
@@ -273,7 +276,7 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
     }
 
     /// Add an immediate for a variation.
-    fn compile_immediate(&mut self, immediate: NodeId<ast::VariationConstant>) {
+    fn compile_immediate(&mut self, immediate: NodeId<ast::VariationImmediate>) {
         let global = self.module.add_global(
             self.context.i8_type(),
             None,
@@ -288,6 +291,8 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
             ),
         );
         global.set_linkage(Linkage::External);
+
+        let v = self.builder.build_alloca(ty, name)
     }
 
     fn gen_expr(&mut self, expr: NodeId<ast::Expr>) -> Value<'ctx> {
