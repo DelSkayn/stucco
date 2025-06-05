@@ -1,9 +1,9 @@
 use crate::{Result, StencilModule};
 use inkwell::{
+    AddressSpace, IntPredicate,
     llvm_sys::LLVMCallConv,
     types::{BasicMetadataTypeEnum, BasicType as _, BasicTypeEnum},
     values::{AnyValue, AnyValueEnum, BasicMetadataValueEnum, BasicValueEnum, PointerValue},
-    AddressSpace, IntPredicate,
 };
 use proc_macro2::Span;
 use std::fmt;

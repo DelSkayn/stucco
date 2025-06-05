@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ast = { workspace = true }
+ast = { workspace = true, features = ["span-locations"] }
 bitflags = "2.9.1"
 common = { workspace = true }
 syn = { workspace = true ,default-features = false }

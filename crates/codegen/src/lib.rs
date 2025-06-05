@@ -7,20 +7,25 @@ use compiler::{
 };
 use inkwell::{
     AddressSpace,
-    builder::Builder,
+    attributes::Attribute,
+    builder::{self, Builder},
     context::Context,
     llvm_sys::LLVMCallConv,
     module::{Linkage, Module},
+    targets::{FileType, Target as LLVMTarget, TargetTriple},
     types::{AnyType, AnyTypeEnum, BasicMetadataTypeEnum, BasicType},
-    values::LLVMTailCallKind,
+    values::{AnyValue, LLVMTailCallKind},
 };
+pub use target::Target;
 use util::{NonBasicTypeEnum, try_any_to_basic};
 use value::Value;
+use wrapper::GlobalValueExt;
 
 mod obj;
 mod target;
 pub mod util;
 mod value;
+mod wrapper;
 
 #[cfg(not(any(feature = "stand-alone", feature = "proc-macro")))]
 compile_error!(
@@ -29,12 +34,14 @@ compile_error!(
 
 pub struct Config {
     pub num_passing_register: usize,
+    pub clobber_immediates: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
             num_passing_register: 8,
+            clobber_immediates: true,
         }
     }
 }
@@ -108,7 +115,7 @@ impl NameGen {
     pub fn name(&mut self, prefix: &str) -> &str {
         self.buffer.clear();
         self.buffer.push_str(prefix);
-        writeln!(&mut self.buffer, "{}", self.id).unwrap();
+        write!(&mut self.buffer, "{}", self.id).unwrap();
         self.id += 1;
         &self.buffer
     }
@@ -122,6 +129,7 @@ pub struct VariationGen<'ctx, 't> {
     types: &'t Types,
     module: Module<'ctx>,
     builder: Builder<'ctx>,
+    pass_through: Vec<Value<'ctx>>,
     symbol_value: HashMap<SymbolId, Value<'ctx>>,
     //variation_data: HashMap<NodeId<ast::Variation>, Value<'ctx>>,
     name_gen: NameGen,
@@ -153,6 +161,7 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
             types: cgen.types,
             module,
             builder,
+            pass_through: Vec::new(),
             symbol_value: HashMap::new(),
             name_gen: NameGen::new(),
         };
@@ -164,6 +173,38 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
 
     pub fn into_module(self) -> Module<'ctx> {
         self.module
+    }
+
+    pub fn into_assembly(self, target: Target) -> String {
+        let (target, triple) = match target {
+            Target::X86_64 => {
+                LLVMTarget::initialize_x86(&Default::default());
+                let triple = TargetTriple::create("x86_64-unknown-gnu");
+                (LLVMTarget::from_triple(&triple).unwrap(), triple)
+            }
+            Target::Aarch64 => todo!(),
+            Target::Riscv => todo!(),
+        };
+
+        let machine = target
+            .create_target_machine(
+                &triple,
+                "generic",
+                "",
+                inkwell::OptimizationLevel::Aggressive,
+                inkwell::targets::RelocMode::Static,
+                inkwell::targets::CodeModel::Medium,
+            )
+            .unwrap();
+
+        self.module
+            .set_data_layout(&machine.get_target_data().get_data_layout());
+        self.module.set_triple(&triple);
+        let buffer = machine
+            .write_to_memory_buffer(&self.module, FileType::Assembly)
+            .unwrap();
+
+        String::from_utf8(buffer.as_slice().to_vec()).unwrap()
     }
 
     fn tyid_to_llvm_type(&self, id: TyId) -> AnyTypeEnum<'ctx> {
@@ -254,10 +295,8 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
             match self.ast[variation] {
                 ast::Variation::Immediate(v) => {
                     immediate.push(v);
-
                 }
-                ast::Variation::Slot(v) => {
-                }
+                ast::Variation::Slot(v) => slots.push((v, p)),
             }
         }
 
@@ -268,9 +307,18 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
 
         let function = self.module.add_function("__stencil__", ty, None);
         function.set_call_conventions(LLVMCallConv::LLVMGHCCallConv as u32);
+        for i in 0..self.config.num_passing_register as u32 {
+            self.pass_through.push(Value::from(
+                function.get_nth_param(i).unwrap().as_any_value_enum(),
+            ))
+        }
 
         let bb = self.context.append_basic_block(function, "entry");
         self.builder.position_at_end(bb);
+
+        for imm in immediate {
+            self.compile_immediate(imm);
+        }
 
         self.gen_expr(self.ast[stencil].body);
     }
@@ -291,8 +339,67 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
             ),
         );
         global.set_linkage(Linkage::External);
+        global.set_dso_local(true);
 
-        let v = self.builder.build_alloca(ty, name)
+        let v = if self.config.clobber_immediates {
+            let union = self
+                .context
+                .struct_type(&[self.context.i64_type().into()], false);
+
+            let v = self
+                .builder
+                .build_alloca(union, self.name_gen.name("alloca_imm"))
+                .unwrap();
+
+            self.builder
+                .build_store(v, global.as_pointer_value())
+                .unwrap();
+
+            let ptr_ty = self.context.ptr_type(AddressSpace::default());
+            let asm_fn_ty = self.context.void_type().fn_type(&[ptr_ty.into()], false);
+
+            let asm = self.context.create_inline_asm(
+                asm_fn_ty,
+                String::new(),
+                "*m".to_string(),
+                true,
+                false,
+                None,
+                false,
+            );
+
+            let call = self
+                .builder
+                .build_indirect_call(asm_fn_ty, asm, &[v.into()], &self.name_gen.name("clobber"))
+                .unwrap();
+
+            let id = Attribute::get_named_enum_kind_id("elementtype");
+            let attr = self.context.create_type_attribute(
+                id,
+                self.context.ptr_type(Default::default()).as_any_type_enum(),
+            );
+            call.add_attribute(inkwell::attributes::AttributeLoc::Param(0), attr);
+            self.builder
+                .build_load(self.context.i64_type(), v, self.name_gen.name("load_imm"))
+                .unwrap()
+        } else {
+            self.builder
+                .build_ptr_to_int(
+                    global.as_pointer_value(),
+                    self.context.i64_type(),
+                    self.name_gen.name("cast_imm"),
+                )
+                .unwrap()
+                .into()
+        };
+
+        /*
+
+        */
+        let symbol = self.symbols.ast_to_symbol[self.ast[immediate].sym].unwrap();
+        /*
+         */
+        self.symbol_value.insert(symbol, Value::from(v));
     }
 
     fn gen_expr(&mut self, expr: NodeId<ast::Expr>) -> Value<'ctx> {
@@ -345,8 +452,20 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
     }
 
     fn gen_become(&mut self, b: NodeId<ast::Become>) {
-        let args: Vec<_> = (0..10).map(|_| self.context.i64_type().into()).collect();
+        let args: Vec<_> = (0..self.config.num_passing_register)
+            .map(|_| self.context.i64_type().into())
+            .collect();
         let ty = self.context.void_type().fn_type(&args, false);
+
+        let arg_count = self.ast.iter_list_node(self.ast[b].args).count();
+        let mut args = Vec::new();
+        for i in 0..(self.config.num_passing_register - arg_count) {
+            args.push(self.pass_through[i].clone().into_int().into())
+        }
+
+        for arg in self.ast.iter_list_node(self.ast[b].args) {
+            args.push(self.gen_expr(arg).into_int().into());
+        }
 
         let func = self.module.add_function(
             &format!("__become_{}__", b.index(self.ast).callee.index(self.ast)),
@@ -358,7 +477,7 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
         // TODO: Fix arguments
         let become_func = self
             .builder
-            .build_call(func, &[], self.name_gen.name("become"))
+            .build_call(func, &args, self.name_gen.name("become"))
             .unwrap();
         become_func.set_call_convention(LLVMCallConv::LLVMGHCCallConv as u32);
         become_func.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindMustTail);

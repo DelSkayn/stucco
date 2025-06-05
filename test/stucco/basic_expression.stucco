@@ -1,6 +1,7 @@
-    stencil add()
+    stencil add(amount: usize)
         variant
+            imm amount
     {
-        let t = 1 + 1u64;
+        let t = 8 + amount;
         become next(t)
     }

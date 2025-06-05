@@ -16,9 +16,13 @@ compiler.workspace = true
 
 # LLVM bindings
 inkwell = { version = "0.6.0", features = ["llvm18-1"] }
+llvm-sys = { version = "*" }
 # Object file parsing
 object = "0.36.2"
 
 
 [dev-dependencies]
 parser = { workspace = true }
+
+[build-dependencies]
+cc = "1.2.25"

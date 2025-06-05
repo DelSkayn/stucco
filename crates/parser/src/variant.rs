@@ -12,7 +12,7 @@ impl Parse for ast::Variant {
             let v = if parser.peek(kw::slot) {
                 let v = parser.parse()?;
                 Variation::Slot(v)
-            } else if parser.peek(Token![const]) {
+            } else if parser.peek(kw::imm) {
                 let v = parser.parse()?;
                 Variation::Immediate(v)
             } else {
