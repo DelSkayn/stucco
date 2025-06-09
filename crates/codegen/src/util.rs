@@ -1,5 +1,4 @@
 use inkwell::types::{AnyTypeEnum, BasicType, BasicTypeEnum, FunctionType, VoidType};
-use object::pe::ANON_OBJECT_HEADER_BIGOBJ_CLASS_ID;
 
 pub enum NonBasicTypeEnum<'ctx> {
     VoidType(VoidType<'ctx>),

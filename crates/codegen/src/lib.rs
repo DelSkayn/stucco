@@ -8,11 +8,11 @@ use compiler::{
 use inkwell::{
     AddressSpace,
     attributes::Attribute,
-    builder::{self, Builder},
+    builder::Builder,
     context::Context,
     llvm_sys::LLVMCallConv,
     module::{Linkage, Module},
-    targets::{FileType, Target as LLVMTarget, TargetTriple},
+    targets::{FileType, Target as LLVMTarget, TargetMachine, TargetTriple},
     types::{AnyType, AnyTypeEnum, BasicMetadataTypeEnum, BasicType},
     values::{AnyValue, LLVMTailCallKind},
 };
@@ -175,7 +175,7 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
         self.module
     }
 
-    pub fn into_assembly(self, target: Target) -> String {
+    fn create_target_machine(&self, target: Target) -> TargetMachine {
         let (target, triple) = match target {
             Target::X86_64 => {
                 LLVMTarget::initialize_x86(&Default::default());
@@ -200,11 +200,25 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
         self.module
             .set_data_layout(&machine.get_target_data().get_data_layout());
         self.module.set_triple(&triple);
+        machine
+    }
+
+    pub fn into_assembly(self, target: Target) -> String {
+        let machine = self.create_target_machine(target);
         let buffer = machine
             .write_to_memory_buffer(&self.module, FileType::Assembly)
             .unwrap();
 
         String::from_utf8(buffer.as_slice().to_vec()).unwrap()
+    }
+
+    pub fn into_object(self, target: Target) -> Vec<u8> {
+        let machine = self.create_target_machine(target);
+        let buffer = machine
+            .write_to_memory_buffer(&self.module, FileType::Object)
+            .unwrap();
+
+        buffer.as_slice().to_vec()
     }
 
     fn tyid_to_llvm_type(&self, id: TyId) -> AnyTypeEnum<'ctx> {
@@ -232,9 +246,9 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
                 .context
                 .ptr_type(AddressSpace::default())
                 .as_any_type_enum(),
-            Ty::Ref(ty_id) => todo!(),
-            Ty::RefMut(ty_id) => todo!(),
-            Ty::Tuple(ty_ids) => todo!(),
+            Ty::Ref(_) => todo!(),
+            Ty::RefMut(_) => todo!(),
+            Ty::Tuple(_) => todo!(),
             Ty::Fn(args, res) => {
                 let args: Vec<BasicMetadataTypeEnum> = args
                     .iter()
@@ -243,7 +257,7 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
                         let ty = self.tyid_to_llvm_type(arg);
                         match try_any_to_basic(ty) {
                             Ok(x) => Some(x.into()),
-                            Err(NonBasicTypeEnum::VoidType(x)) => None,
+                            Err(NonBasicTypeEnum::VoidType(_)) => None,
                             Err(NonBasicTypeEnum::FunctionType(_)) => Some(
                                 self.context
                                     .ptr_type(AddressSpace::default())
@@ -264,7 +278,7 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
                 };
                 ty.as_any_type_enum()
             }
-            Ty::Array(ty_id, _) => todo!(),
+            Ty::Array(_, _) => todo!(),
             Ty::Var(..) => todo!(),
         }
     }
@@ -404,9 +418,9 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
 
     fn gen_expr(&mut self, expr: NodeId<ast::Expr>) -> Value<'ctx> {
         match self.ast[expr] {
-            ast::Expr::If(node_id) => todo!(),
+            ast::Expr::If(_) => todo!(),
             ast::Expr::Binary(b) => self.gen_binary(b, expr),
-            ast::Expr::Unary(node_id) => todo!(),
+            ast::Expr::Unary(_) => todo!(),
             ast::Expr::Block(b) => {
                 let returns_last = self.ast[b].returns_last;
                 let mut value = None;
@@ -419,26 +433,26 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
                     Value::void()
                 }
             }
-            ast::Expr::Cast(node_id) => todo!(),
-            ast::Expr::Loop(node_id) => todo!(),
-            ast::Expr::While(node_id) => todo!(),
+            ast::Expr::Cast(_) => todo!(),
+            ast::Expr::Loop(_) => todo!(),
+            ast::Expr::While(_) => todo!(),
             ast::Expr::Let(l) => {
                 let expr = self.gen_expr(self.ast[l].expr);
                 let id = self.symbols.ast_to_symbol[self.ast[l].sym].unwrap();
                 self.symbol_value.insert(id, expr);
                 Value::void()
             }
-            ast::Expr::Continue(span) => todo!(),
-            ast::Expr::Break(node_id) => todo!(),
-            ast::Expr::Return(node_id) => todo!(),
+            ast::Expr::Continue(_) => todo!(),
+            ast::Expr::Break(_) => todo!(),
+            ast::Expr::Return(_) => todo!(),
             ast::Expr::Become(b) => {
                 self.gen_become(b);
                 Value::void()
             }
-            ast::Expr::Call(node_id) => todo!(),
-            ast::Expr::Method(node_id) => todo!(),
-            ast::Expr::Field(node_id) => todo!(),
-            ast::Expr::Index(node_id) => todo!(),
+            ast::Expr::Call(_) => todo!(),
+            ast::Expr::Method(_) => todo!(),
+            ast::Expr::Field(_) => todo!(),
+            ast::Expr::Index(_) => todo!(),
             ast::Expr::Literal(l) => self.gen_lit(l, expr),
             ast::Expr::Symbol(s) => {
                 let id = self.symbols.ast_to_symbol[s].unwrap();
@@ -680,11 +694,11 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
 
     fn gen_lit(&self, lit: NodeId<ast::Lit>, expr: NodeId<ast::Expr>) -> Value<'ctx> {
         match &self.ast[lit] {
-            ast::Lit::Str(lit_str) => todo!(),
-            ast::Lit::ByteStr(lit_byte_str) => todo!(),
-            ast::Lit::CStr(lit_cstr) => todo!(),
-            ast::Lit::Byte(lit_byte) => todo!(),
-            ast::Lit::Char(lit_char) => todo!(),
+            ast::Lit::Str(_) => todo!(),
+            ast::Lit::ByteStr(_) => todo!(),
+            ast::Lit::CStr(_) => todo!(),
+            ast::Lit::Byte(_) => todo!(),
+            ast::Lit::Char(_) => todo!(),
             ast::Lit::Int(lit_int) => {
                 let ty = self.types.find_type_for_expr(expr).unwrap();
                 let v = match self.types.type_graph[ty] {
@@ -736,7 +750,7 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
                     self.context.bool_type().const_int(0, false).into()
                 }
             }
-            ast::Lit::Verbatim(literal) => todo!(),
+            ast::Lit::Verbatim(_) => todo!(),
             _ => todo!(),
         }
     }

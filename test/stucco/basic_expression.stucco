@@ -1,6 +1,6 @@
     stencil add(amount: usize)
         variant
-            imm amount
+            slot amount
     {
         let t = 8 + amount;
         become next(t)
