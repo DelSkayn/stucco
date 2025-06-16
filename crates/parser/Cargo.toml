@@ -4,14 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-span-locations = ["ast/span-locations"]
 default = ["span-locations"]
+span-locations = ["ast/span-locations"]
+nightly = []
 
 [dependencies]
 ast = { workspace = true }
 common = { workspace = true }
 proc-macro2 = { workspace = true }
-syn = { workspace = true , default-features = false, features = ["parsing","printing"]}
 
 [dev-dependencies]
 ast = { workspace = true, features = ["print"] }

@@ -1,10 +1,14 @@
 use ast::{BinOp, NodeId, Spanned as _, UnOp};
-use syn::{token, Result, Token};
+use proc_macro2::Delimiter;
 
-use crate::{prime::parse_prime, Parse, Parser};
+use crate::{
+    ParsePush, Parser, Result,
+    prime::parse_prime,
+    token::{self, T},
+};
 
-impl Parse for ast::Expr {
-    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
+impl ParsePush for ast::Expr {
+    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
         parse_binding(parser, BindingPower::Base)
     }
 }
@@ -32,16 +36,16 @@ pub enum BindingPower {
 macro_rules! parse_bin_op {
     ($bind:ident,$parser:expr,$i:ident {
         $($bp:expr => {
-            $(Token![$t:tt] => $op:expr),* $(,)?
+            $([$t:tt] => $op:expr),* $(,)?
         })*
     }) => {
         {
             $($(
-                if $parser.peek(Token![$t]){
+                if let Some(t) = $parser.eat::<T![$t]>(){
                     if $bp < $i {
                         break
                     }
-                    let span = $parser.parse_syn::<Token![$t]>()?.span();
+                    let span = t.0;
                     let right = parse_binding($parser, $bp)?;
                     let new_expr = $parser.push(ast::BinaryExpr{
                         left: $bind,
@@ -65,14 +69,14 @@ fn parse_binding(parser: &mut Parser, bp: BindingPower) -> Result<NodeId<ast::Ex
     };
 
     loop {
-        if parser.peek(token::Paren) {
+        if parser.peek_group(Delimiter::Parenthesis) {
             if BindingPower::CallIndex < bp {
                 break;
             }
             lhs = parse_call(parser, lhs)?;
             continue;
         }
-        if parser.peek(Token![.]) {
+        if parser.peek::<T![.]>() {
             if BindingPower::CallIndex < bp {
                 break;
             }
@@ -83,55 +87,55 @@ fn parse_binding(parser: &mut Parser, bp: BindingPower) -> Result<NodeId<ast::Ex
         parse_bin_op! {
             lhs,parser,bp {
                 BindingPower::Cmp => {
-                    Token![<=] =>  BinOp::Le,
-                    Token![>=] =>  BinOp::Ge,
-                    Token![==] =>  BinOp::Eq,
-                    Token![!=] =>  BinOp::Ne,
+                    [<=] =>  BinOp::Le,
+                    [>=] =>  BinOp::Ge,
+                    [==] =>  BinOp::Eq,
+                    [!=] =>  BinOp::Ne,
                 }
                 BindingPower::Assign => {
-                    Token![=] => BinOp::Assign,
-                    Token![+=] => BinOp::AddAssign,
-                    Token![-=] => BinOp::SubAssign,
-                    Token![*=] => BinOp::MullAssign,
-                    Token![/=] => BinOp::DivAssign,
-                    Token![%=] => BinOp::RemAssign,
-                    Token![<<=] => BinOp::ShlAssign,
-                    Token![>>=] => BinOp::ShrAssign,
-                    Token![|=] => BinOp::BitOrAssign,
-                    Token![^=] => BinOp::BitXorAssign,
-                    Token![&=] => BinOp::BitAndAssign,
+                    [=] => BinOp::Assign,
+                    [+=] => BinOp::AddAssign,
+                    [-=] => BinOp::SubAssign,
+                    [*=] => BinOp::MullAssign,
+                    [/=] => BinOp::DivAssign,
+                    [%=] => BinOp::RemAssign,
+                    [<<=] => BinOp::ShlAssign,
+                    [>>=] => BinOp::ShrAssign,
+                    [|=] => BinOp::BitOrAssign,
+                    [^=] => BinOp::BitXorAssign,
+                    [&=] => BinOp::BitAndAssign,
                 }
                 BindingPower::Or => {
-                    Token![||] => BinOp::Or,
+                    [||] => BinOp::Or,
                 }
                  BindingPower::And => {
-                    Token![&&] => BinOp::And,
+                    [&&] => BinOp::And,
                 }
                  BindingPower::BitOr => {
-                    Token![|] => BinOp::BitOr,
+                    [|] => BinOp::BitOr,
                  }
                  BindingPower::BitXor => {
-                    Token![^] => BinOp::BitXor,
+                    [^] => BinOp::BitXor,
                  }
                  BindingPower::BitAnd => {
-                    Token![&] => BinOp::BitAnd,
+                    [&] => BinOp::BitAnd,
                  }
                  BindingPower::Shift => {
-                    Token![<<] => BinOp::Shl,
-                    Token![>>] => BinOp::Shr,
+                    [<<] => BinOp::Shl,
+                    [>>] => BinOp::Shr,
                  }
                  BindingPower::Cmp => {
-                    Token![<] =>  BinOp::Lt,
-                    Token![>] =>  BinOp::Gt,
+                    [<] =>  BinOp::Lt,
+                    [>] =>  BinOp::Gt,
                  }
                  BindingPower::AddSub => {
-                    Token![+] => BinOp::Add,
-                    Token![-] => BinOp::Sub,
+                    [+] => BinOp::Add,
+                    [-] => BinOp::Sub,
                  }
                  BindingPower::MulDiv => {
-                    Token![*] => BinOp::Mull,
-                    Token![/] => BinOp::Div,
-                    Token![%] => BinOp::Rem,
+                    [*] => BinOp::Mull,
+                    [/] => BinOp::Div,
+                    [%] => BinOp::Rem,
                  }
             }
         }
@@ -143,14 +147,14 @@ fn parse_binding(parser: &mut Parser, bp: BindingPower) -> Result<NodeId<ast::Ex
 }
 
 fn parse_unary(parser: &mut Parser) -> Result<NodeId<ast::Expr>> {
-    let (span, op) = if parser.peek(Token![!]) {
-        let span = parser.parse_syn::<Token![!]>()?.span();
+    let (span, op) = if parser.peek::<T![!]>() {
+        let span = parser.parse::<T![!]>()?.0;
         (span, UnOp::Not)
-    } else if parser.peek(Token![*]) {
-        let span = parser.parse_syn::<Token![*]>()?.span();
+    } else if parser.peek::<T![*]>() {
+        let span = parser.parse::<T![*]>()?.0;
         (span, UnOp::Star)
-    } else if parser.peek(Token![*]) {
-        let span = parser.parse_syn::<Token![-]>()?.span();
+    } else if parser.peek::<T![*]>() {
+        let span = parser.parse::<T![-]>()?.0;
         (span, UnOp::Minus)
     } else {
         return parse_prime(parser);
@@ -168,7 +172,7 @@ fn parse_unary(parser: &mut Parser) -> Result<NodeId<ast::Expr>> {
 
 fn parse_call(parser: &mut Parser, callee: NodeId<ast::Expr>) -> Result<NodeId<ast::Expr>> {
     let span = parser.span();
-    let args = parser.parse_parenthesized(|parser| parser.parse_terminated::<_, Token![,]>())?;
+    let args = parser.parse_parenthesized(|parser| parser.parse_terminated::<_, T![,]>())?;
     let call = parser.push(ast::Call {
         func: callee,
         args,
@@ -178,11 +182,10 @@ fn parse_call(parser: &mut Parser, callee: NodeId<ast::Expr>) -> Result<NodeId<a
 }
 
 fn parse_dot(parser: &mut Parser, base: NodeId<ast::Expr>) -> Result<NodeId<ast::Expr>> {
-    let span = parser.parse_syn::<Token![.]>()?.span();
-    if parser.peek2(token::Paren) {
-        let ident = parser.parse_syn_push()?;
-        let args =
-            parser.parse_parenthesized(|parser| parser.parse_terminated::<_, Token![,]>())?;
+    let span = parser.parse::<T![.]>()?.0;
+    if parser.peek2::<token::Paren>() {
+        let ident = parser.parse_push()?;
+        let args = parser.parse_parenthesized(|parser| parser.parse_terminated::<_, T![,]>())?;
         let call = parser.push(ast::Method {
             receiver: base,
             name: ident,
@@ -191,7 +194,7 @@ fn parse_dot(parser: &mut Parser, base: NodeId<ast::Expr>) -> Result<NodeId<ast:
         })?;
         parser.push(ast::Expr::Method(call))
     } else {
-        let ident = parser.parse_syn_push()?;
+        let ident = parser.parse_push()?;
         let field = parser.push(ast::Field {
             base,
             field: ident,

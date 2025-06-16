@@ -1,49 +1,45 @@
+use crate::{ParsePush, Parser, Result, T, token};
 use ast::{NodeId, Spanned as _};
-use syn::{token, Result, Token};
 
-use crate::{Parse, Parser};
-
-impl Parse for ast::Type {
-    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
-        if parser.peek(Token![*]) {
-            let v = ast::Type::Ptr(parser.parse()?);
+impl ParsePush for ast::Type {
+    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
+        if parser.peek::<T![*]>() {
+            let v = ast::Type::Ptr(parser.parse_push()?);
             return parser.push(v);
         }
 
-        if parser.peek(Token![fn]) {
-            let v = ast::Type::Fn(parser.parse()?);
+        if parser.peek::<T![fn]>() {
+            let v = ast::Type::Fn(parser.parse_push()?);
             return parser.push(v);
         }
 
-        if parser.peek(Token![&]) {
-            let v = ast::Type::Reference(parser.parse()?);
+        if parser.peek::<T![&]>() {
+            let v = ast::Type::Reference(parser.parse_push()?);
             return parser.push(v);
         }
 
-        if parser.peek(token::Paren) {
-            let v = ast::Type::Tuple(parser.parse()?);
+        if parser.peek::<token::Paren>() {
+            let v = ast::Type::Tuple(parser.parse_push()?);
             return parser.push(v);
         }
 
-        if parser.peek(token::Bracket) {
-            let v = ast::Type::Array(parser.parse()?);
+        if parser.peek::<token::Bracket>() {
+            let v = ast::Type::Array(parser.parse_push()?);
             return parser.push(v);
         }
 
-        let name = parser.parse_syn_push()?;
+        let name = parser.parse_push()?;
         parser.push(ast::Type::Direct(name))
     }
 }
 
-impl Parse for ast::TypeFn {
-    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
-        let span = parser.parse_syn::<Token![fn]>()?.span();
-        let params =
-            parser.parse_parenthesized(|parser| parser.parse_terminated::<_, Token![,]>())?;
+impl ParsePush for ast::TypeFn {
+    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
+        let span = parser.parse::<T![fn]>()?.0;
+        let params = parser.parse_parenthesized(|parser| parser.parse_terminated::<_, T![,]>())?;
 
-        let output = if parser.peek(Token![->]) {
-            parser.parse_syn::<Token![->]>()?;
-            Some(parser.parse()?)
+        let output = if let Some(_) = parser.eat::<T![->]>() {
+            Some(parser.parse_push()?)
         } else {
             None
         };
@@ -56,45 +52,38 @@ impl Parse for ast::TypeFn {
     }
 }
 
-impl Parse for ast::TypePtr {
-    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
-        let span = parser.parse_syn::<Token![*]>()?.span();
-        let mutable = if parser.peek(Token![mut]) {
-            parser.parse_syn::<Token![mut]>()?;
+impl ParsePush for ast::TypePtr {
+    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
+        let span = parser.parse::<T![*]>()?.0;
+        let mutable = if let Some(_) = parser.eat::<T![mut]>() {
             true
-        } else if parser.peek(Token![const]) {
-            parser.parse_syn::<Token![const]>()?;
+        } else if let Some(_) = parser.eat::<T![const]>() {
             false
         } else {
             return Err(parser.error("expected either `mut` or `const`"));
         };
-        let ty = parser.parse()?;
+        let ty = parser.parse_push()?;
 
         parser.push(ast::TypePtr { mutable, span, ty })
     }
 }
 
-impl Parse for ast::TypeReference {
-    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
-        let span = parser.parse_syn::<Token![*]>()?.span();
-        let mutable = if parser.peek(Token![mut]) {
-            parser.parse_syn::<Token![mut]>()?;
-            true
-        } else {
-            false
-        };
-        let ty = parser.parse()?;
+impl ParsePush for ast::TypeReference {
+    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
+        let span = parser.parse::<T![*]>()?.0;
+        let mutable = parser.eat::<T![mut]>().is_some();
+        let ty = parser.parse_push()?;
         parser.push(ast::TypeReference { mutable, span, ty })
     }
 }
 
-impl Parse for ast::TypeArray {
-    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
+impl ParsePush for ast::TypeArray {
+    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
         let span = parser.span();
         parser.parse_bracketed(|parser| {
-            let ty = parser.parse()?;
-            parser.parse_syn::<Token![;]>()?;
-            let len = parser.parse()?;
+            let ty = parser.parse_push()?;
+            parser.parse::<T![;]>()?;
+            let len = parser.parse_push()?;
             parser.push(ast::TypeArray {
                 span,
                 elem: ty,
@@ -104,11 +93,10 @@ impl Parse for ast::TypeArray {
     }
 }
 
-impl Parse for ast::TypeTuple {
-    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
+impl ParsePush for ast::TypeTuple {
+    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
         let span = parser.span();
-        let fields =
-            parser.parse_parenthesized(|parser| parser.parse_terminated::<_, Token![,]>())?;
+        let fields = parser.parse_parenthesized(|parser| parser.parse_terminated::<_, T![,]>())?;
         parser.push(ast::TypeTuple { fields, span })
     }
 }

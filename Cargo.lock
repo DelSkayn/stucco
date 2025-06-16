@@ -323,7 +323,6 @@ dependencies = [
  "proc-macro2",
  "stucco_ast",
  "stucco_common",
- "syn",
 ]
 
 [[package]]

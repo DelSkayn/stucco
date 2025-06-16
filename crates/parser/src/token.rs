@@ -1,0 +1,254 @@
+use crate::buffer::TokenSlice;
+use ast::Span;
+use proc_macro2::{Delimiter, Spacing};
+
+pub trait Token: Peek + Sized {
+    const NAME: &'static str;
+
+    fn lex<'a>(slice: &TokenSlice<'a>) -> Option<Self>;
+}
+
+pub trait Peek: Sized {
+    //const LENGTH: usize;
+
+    fn peek(slice: &TokenSlice) -> bool;
+}
+
+macro_rules! impl_keywords {
+    ($($kw:ident => $type:ident),*$(,)?) => {
+        $(
+            pub struct $type(pub Span);
+
+            impl ::ast::Spanned for $type{
+                fn span(&self) -> Span{
+                    self.0.clone()
+                }
+            }
+
+            impl Token for $type{
+                const NAME: &'static str = stringify!($kw);
+
+                fn lex<'a>(slice: &TokenSlice<'a>) -> Option<Self> {
+                    let ident = slice.ident()?;
+                    if ident == stringify!($kw) {
+                        slice.advance();
+                        Some(Self(ident.span().into()))
+                    } else {
+                        None
+                    }
+                }
+            }
+
+            impl Peek for $type{
+                //const LENGTH: usize = 1;
+
+                fn peek(slice: &TokenSlice) -> bool {
+                    let Some(ident) = slice.ident() else {
+                        return false
+                    };
+                    ident == stringify!($name)
+                }
+            }
+        )*
+
+        macro_rules! T_keyword{
+            $(
+                ($kw) => {
+                    $crate::token::$type
+                };
+            )*
+        }
+    };
+}
+
+impl_keywords! {
+    become => Become,
+    break => Break,
+    const => Const,
+    else => Else,
+    fn => Fn,
+    if => If,
+    loop => Loop,
+    let => Let,
+    mut => Mut,
+    return => Return,
+    while => While,
+    mod => Mod,
+    imm => Imm,
+    slot => Slot,
+    stencil => Stencil,
+    variant => Variant,
+}
+pub(crate) use T_keyword;
+
+macro_rules! impl_punct{
+    ($([$punct:tt]=> $type:ident),*$(,)?) => {
+        $(pub struct $type(pub Span);
+
+        impl ::ast::Spanned for $type{
+            fn span(&self) -> Span{
+                self.0.clone()
+            }
+        }
+
+        impl Token for $type{
+            const NAME: &'static str = stringify!($punct);
+
+            fn lex<'a>(slice: &TokenSlice<'a>) -> Option<Self> {
+                assert!(const{ Self::NAME.len() != 0 });
+
+                let bytes = Self::NAME.as_bytes();
+
+                let mut punct = slice.punct()?;
+                if punct.as_char() != bytes[0] as char {
+                    return None;
+                }
+
+                let check_point = slice.clone();
+                slice.advance();
+
+                let mut span: Span = punct.span().into();
+
+                for i in 1..bytes.len() {
+                    if punct.spacing() != Spacing::Joint {
+                        slice.restore(check_point);
+                        return None;
+                    }
+                    let new_punct = slice.punct()?;
+                    if new_punct.as_char() != bytes[i] as char {
+                        slice.restore(check_point);
+                        return None;
+                    }
+                    punct = new_punct;
+                    span = span.try_join(punct.span().into());
+                }
+
+                if punct.spacing() != Spacing::Alone {
+                    slice.restore(check_point);
+                    return None;
+                }
+
+
+                Some(Self(span))
+            }
+        }
+
+        impl Peek for $type{
+            //const LENGTH: usize = stringify!($punct).len();
+
+            fn peek(slice: &TokenSlice) -> bool {
+                assert!(const{ Self::NAME.len() != 0 });
+
+                let bytes = Self::NAME.as_bytes();
+
+                let Some(punct) = slice.punct() else {
+                    return false
+                };
+                if punct.as_char() != bytes[0] as char {
+                    return false;
+                }
+
+                let slice = slice.clone();
+                slice.advance();
+
+                for i in 1..bytes.len() {
+                    if punct.spacing() != Spacing::Joint {
+                        return false;
+                    }
+                    let Some(punct) = slice.punct() else {
+                        return false
+                    };
+                    if punct.as_char() != bytes[i] as char {
+                        return false;
+                    }
+                }
+
+                punct.spacing() != Spacing::Alone
+            }
+        })*
+
+        macro_rules! impl_t_punct{
+            $(
+                ($punct) => {
+                    $crate::token::$type
+                };
+            )*
+            ($t:tt) => {
+                crate::token::T_keyword!($t)
+            };
+        }
+    };
+}
+
+impl_punct! {
+    [&] => And,
+    [&&] => AndAnd,
+    [&=] => AndEq,
+    [:] => Colon,
+    [,] => Comma,
+    [.] => Dot,
+    [=] => Eq,
+    [==] => EqEq,
+    [!] => Exlaim,
+    [!=] => ExlaimEq,
+    [/] => FSlash,
+    [/=] => FSlashEq,
+    [^] => Hat,
+    [^=] => HatEq,
+    [|] => HBar,
+    [||] => HBarHBar,
+    [|=] => HBarEq,
+    [%] => Percent,
+    [%=] => PercentEq,
+    [+] => Plus,
+    [+=] => PlusEq,
+    [<] => LChevron,
+    [<=] => LChevronEq,
+    [<<] => LChevronLChevron,
+    [<<=] => LChevronLChevronEq,
+    [-] => Minus,
+    [-=] => MinusEq,
+    [->] => RArrow,
+    [>] => RChevron,
+    [>=] => RChevronEq,
+    [>>] => RChevronRChevron,
+    [>>=] => RChevronRChevronEq,
+    [;] => SemiColon,
+    [*] => Star,
+    [*=] => StarEq,
+}
+pub(crate) use impl_t_punct as T;
+
+pub struct Paren;
+pub struct Bracket;
+pub struct Brace;
+
+impl Peek for Paren {
+    fn peek(slice: &TokenSlice) -> bool {
+        if let Some((group, _)) = slice.group() {
+            group.delimiter() == Delimiter::Parenthesis
+        } else {
+            false
+        }
+    }
+}
+
+impl Peek for Bracket {
+    fn peek(slice: &TokenSlice) -> bool {
+        if let Some((group, _)) = slice.group() {
+            group.delimiter() == Delimiter::Bracket
+        } else {
+            false
+        }
+    }
+}
+
+impl Peek for Brace {
+    fn peek(slice: &TokenSlice) -> bool {
+        if let Some((group, _)) = slice.group() {
+            group.delimiter() == Delimiter::Brace
+        } else {
+            false
+        }
+    }
+}

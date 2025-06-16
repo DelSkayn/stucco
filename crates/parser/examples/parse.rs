@@ -1,6 +1,6 @@
 use ast::AstRender;
 use std::{env, error::Error, io::Read};
-use stucco_parser::{parse_external_module, Parser};
+use stucco_parser::{Parser, parse_external_module};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let src = if let Some(arg) = env::args().skip(1).next() {

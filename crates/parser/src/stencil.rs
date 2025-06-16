@@ -1,32 +1,30 @@
 use ast::{NodeId, Spanned as _, Variant};
-use syn::{Result, Token};
 
-use crate::{kw, Parse, Parser};
+use crate::{ParsePush, Parser, Result, T};
 
-impl Parse for ast::Stencil {
-    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
-        let span = parser.parse_syn::<kw::stencil>()?.span();
-        let sym = parser.parse()?;
+impl ParsePush for ast::Stencil {
+    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
+        let span = parser.parse::<T![stencil]>()?.0;
+        let sym = parser.parse_push()?;
 
         let parameters =
-            parser.parse_parenthesized(|parser| parser.parse_terminated::<_, Token![,]>())?;
+            parser.parse_parenthesized(|parser| parser.parse_terminated::<_, T![,]>())?;
 
-        let output = if parser.peek(Token![->]) {
-            parser.parse_syn::<Token![->]>()?;
-            Some(parser.parse()?)
+        let output = if let Some(_) = parser.eat::<T![->]>() {
+            Some(parser.parse_push()?)
         } else {
             None
         };
 
         let mut head = None;
         let mut current = None;
-        while parser.peek(kw::variant) {
-            let item = parser.parse::<Variant>()?;
+        while parser.peek::<T![variant]>() {
+            let item = parser.parse_push::<Variant>()?;
             parser.push_list(&mut head, &mut current, item)?;
         }
         let variants = head;
 
-        let body = parser.parse()?;
+        let body = parser.parse_push()?;
         let body = parser.push(ast::Expr::Block(body))?;
 
         parser.push(ast::Stencil {
@@ -40,12 +38,12 @@ impl Parse for ast::Stencil {
     }
 }
 
-impl Parse for ast::Parameter {
-    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
+impl ParsePush for ast::Parameter {
+    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
         let span = parser.span();
-        let sym = parser.parse()?;
-        parser.parse_syn::<Token![:]>()?;
-        let ty = parser.parse()?;
+        let sym = parser.parse_push()?;
+        parser.parse::<T![:]>()?;
+        let ty = parser.parse_push()?;
 
         parser.push(Self { sym, ty, span })
     }

@@ -1,19 +1,17 @@
-use ast::{NodeId, Spanned as _, Variant, Variation, VariationImmediate, VariationSlot};
-use syn::{Result, Token};
+use crate::{ParsePush, Parser, Result, T};
+use ast::{NodeId, Variant, Variation, VariationImmediate, VariationSlot};
 
-use crate::{Parse, Parser, kw};
-
-impl Parse for ast::Variant {
-    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
-        let span = parser.parse_syn::<kw::variant>()?.span();
+impl ParsePush for ast::Variant {
+    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
+        let span = parser.parse::<T![variant]>()?.0;
         let mut head = None;
         let mut current = None;
         loop {
-            let v = if parser.peek(kw::slot) {
-                let v = parser.parse()?;
+            let v = if parser.peek::<T![slot]>() {
+                let v = parser.parse_push()?;
                 Variation::Slot(v)
-            } else if parser.peek(kw::imm) {
-                let v = parser.parse()?;
+            } else if parser.peek::<T![imm]>() {
+                let v = parser.parse_push()?;
                 Variation::Immediate(v)
             } else {
                 break;
@@ -22,10 +20,9 @@ impl Parse for ast::Variant {
             let n = parser.push(v)?;
             parser.push_list(&mut head, &mut current, n)?;
 
-            if !parser.peek(Token![,]) {
+            let Some(_) = parser.eat::<T![,]>() else {
                 break;
-            }
-            parser.parse_syn::<Token![,]>()?;
+            };
         }
 
         parser.push(Variant {
@@ -35,18 +32,18 @@ impl Parse for ast::Variant {
     }
 }
 
-impl Parse for ast::VariationSlot {
-    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
-        let span = parser.parse_syn::<kw::slot>()?.span();
-        let sym = parser.parse()?;
+impl ParsePush for ast::VariationSlot {
+    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
+        let span = parser.parse::<T![slot]>()?.0;
+        let sym = parser.parse_push()?;
         parser.push(VariationSlot { span, sym })
     }
 }
 
-impl Parse for ast::VariationImmediate {
-    fn parse(parser: &mut Parser) -> Result<NodeId<Self>> {
-        let span = parser.parse_syn::<kw::imm>()?.span();
-        let sym = parser.parse()?;
+impl ParsePush for ast::VariationImmediate {
+    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
+        let span = parser.parse::<T![imm]>()?.0;
+        let sym = parser.parse_push()?;
         parser.push(VariationImmediate { span, sym })
     }
 }
