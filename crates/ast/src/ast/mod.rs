@@ -1,3 +1,8 @@
+use common::{
+    id,
+    id::{Id, IdSet},
+    thinvec::ThinVec,
+};
 use std::{
     cmp::Eq,
     error,
@@ -6,17 +11,15 @@ use std::{
     ops::{Index, IndexMut},
     u32,
 };
+use token::{
+    Span, Spanned,
+    token::{Ident, Lit},
+};
 
 #[cfg(feature = "print")]
 mod print;
-use common::{
-    id,
-    id::{Id, IdSet},
-    thinvec::ThinVec,
-};
 #[cfg(feature = "print")]
 pub use print::{AstDisplay, AstFormatter, AstRender};
-use syn::{Ident, Lit};
 
 pub trait NodeStorage<T: Node> {
     fn storage_get(&self, idx: u32) -> Option<&T>;
@@ -198,16 +201,6 @@ impl fmt::Display for PushNodeError {
 }
 impl error::Error for PushNodeError {}
 
-impl From<PushNodeError> for syn::Error {
-    fn from(value: PushNodeError) -> Self {
-        let _ = value;
-        syn::Error::new(
-            proc_macro2::Span::call_site(),
-            "exceeded maximum number of tokens",
-        )
-    }
-}
-
 pub struct Ast<L> {
     library: L,
 }
@@ -247,14 +240,14 @@ where
         self.library.clear()
     }
 
-    pub fn iter_list<T>(&self, id: Option<NodeListId<T>>) -> ListIter<L, T> {
+    pub fn iter_list<'a, T>(&'a self, id: Option<NodeListId<T>>) -> ListIter<'a, L, T> {
         ListIter {
             ast: self,
             current: id,
         }
     }
 
-    pub fn iter_list_node<T>(&self, id: Option<NodeListId<T>>) -> ListIterNode<L, T> {
+    pub fn iter_list_node<'a, T>(&'a self, id: Option<NodeListId<T>>) -> ListIterNode<'a, L, T> {
         ListIterNode {
             ast: self,
             current: id,
@@ -371,62 +364,6 @@ pub trait NodeLibrary {
     fn clear(&mut self);
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct Span(proc_macro2::Span);
-
-impl std::hash::Hash for Span {
-    fn hash<H: Hasher>(&self, _state: &mut H) {}
-}
-impl std::cmp::PartialEq for Span {
-    fn eq(&self, _other: &Self) -> bool {
-        true
-    }
-}
-impl std::cmp::Eq for Span {}
-
-impl Span {
-    pub fn call_site() -> Self {
-        Self(proc_macro2::Span::call_site())
-    }
-
-    pub fn try_join(&self, other: Self) -> Self {
-        self.0
-            .join(other.0)
-            .map(Span)
-            .unwrap_or_else(|| self.clone())
-    }
-
-    #[cfg(feature = "span-locations")]
-    pub fn byte_range(&self) -> std::ops::Range<usize> {
-        self.0.byte_range()
-    }
-}
-
-impl From<proc_macro2::Span> for Span {
-    fn from(value: proc_macro2::Span) -> Self {
-        Self(value)
-    }
-}
-
-impl From<Span> for proc_macro2::Span {
-    fn from(value: Span) -> Self {
-        value.0
-    }
-}
-
-pub trait Spanned {
-    fn span(&self) -> Span;
-}
-
-impl<T> Spanned for T
-where
-    T: syn::spanned::Spanned,
-{
-    fn span(&self) -> Span {
-        Span::from(self.span())
-    }
-}
-
 pub trait AstSpanned {
     fn ast_span<L: NodeLibrary>(&self, ast: &Ast<L>) -> Span;
 }
@@ -446,12 +383,6 @@ where
 {
     fn ast_span<L: NodeLibrary>(&self, ast: &Ast<L>) -> Span {
         ast[*self].ast_span(ast)
-    }
-}
-
-impl AstSpanned for Span {
-    fn ast_span<L: NodeLibrary>(&self, _: &Ast<L>) -> Span {
-        *self
     }
 }
 
@@ -555,14 +486,14 @@ macro_rules! ast_struct {
                 $(#[$field_m])*
                 pub $field: $ty,
             )*
-            pub span: crate::ast::Span
+            pub span: ::token::Span
         }
 
         impl $crate::ast::Node for $name{}
 
-        impl crate::ast::Spanned for $name
+        impl ::token::Spanned for $name
         {
-            fn span(&self) -> crate::ast::Span {
+            fn span(&self) -> ::token::Span {
                 self.span
             }
         }
@@ -613,7 +544,7 @@ macro_rules! ast_enum{
 
         impl $crate::ast::AstSpanned for $name
         {
-            fn ast_span<L: $crate::ast::NodeLibrary>(&self, ast: &$crate::ast::Ast<L>) -> $crate::ast::Span {
+            fn ast_span<L: $crate::ast::NodeLibrary>(&self, ast: &$crate::ast::Ast<L>) -> ::token::Span {
                 match *self{
                     $(
                         Self::$variant(ref x) => {

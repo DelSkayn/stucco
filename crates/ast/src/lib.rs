@@ -3,9 +3,12 @@ pub mod visit;
 
 pub use ast::Node;
 use ast::NodeLibrary;
-pub use ast::{AstSpanned, NodeId, NodeList, NodeListId, PushNodeError, Span, Spanned};
+pub use ast::{AstSpanned, NodeId, NodeList, NodeListId, PushNodeError};
 use common::id::IdSet;
-pub use syn::{Ident, Lit};
+pub use token::{
+    Span, Spanned,
+    token::{Ident, Lit},
+};
 
 #[cfg(feature = "print")]
 pub use ast::{AstDisplay, AstFormatter, AstRender};

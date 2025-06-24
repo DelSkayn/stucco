@@ -1,0 +1,11 @@
+[package]
+name = "stucco_token"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["span-locations"]
+span-locations = ["proc-macro2/span-locations"]
+
+[dependencies]
+proc-macro2 = { workspace = true }

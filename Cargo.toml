@@ -13,6 +13,7 @@ compiler = { path = "./crates/compiler", package = "stucco_compiler"}
 parser = { path = "./crates/parser", package = "stucco_parser"}
 derive = { path = "./crates/derive", package = "stucco_derive"}
 runner = { path = "./crates/runner", package = "stucco_runner"}
+token = { path = "./crates/token", package = "stucco_token" }
 
 proc-macro2 = "1.0.86"
 hashbrown = {version = "0.14.5"}

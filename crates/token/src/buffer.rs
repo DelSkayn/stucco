@@ -1,10 +1,10 @@
+use crate::{Span, Spanned as _, TokenError, token::Lit};
+use proc_macro2::{Delimiter, Group, Ident, Punct, TokenStream};
 use std::{cell::Cell, fmt, marker::PhantomData, ptr::NonNull};
-
-use proc_macro2::{Delimiter, Group, Ident, Literal, Punct, Span, TokenStream};
 
 pub enum Token {
     Ident(Ident),
-    Literal(Literal),
+    Literal(Lit),
     Punct(Punct),
     Group(Group, usize),
     Back(usize),
@@ -27,7 +27,7 @@ pub struct TokenBuffer {
 }
 
 impl TokenBuffer {
-    pub fn from_stream(stream: TokenStream) -> Self {
+    pub fn from_stream(stream: TokenStream) -> Result<Self, TokenError> {
         let mut buffer = Vec::new();
 
         // Buffer token to handle the empty case consistantly
@@ -36,7 +36,7 @@ impl TokenBuffer {
             0,
         ));
 
-        Self::collect(stream, &mut buffer);
+        Self::collect(stream, &mut buffer)?;
 
         let len = buffer.len();
         buffer.push(Token::Back(len));
@@ -45,12 +45,12 @@ impl TokenBuffer {
         };
         *group_len = len;
 
-        TokenBuffer {
+        Ok(TokenBuffer {
             tokens: buffer.into_boxed_slice(),
-        }
+        })
     }
 
-    fn collect(stream: TokenStream, buffer: &mut Vec<Token>) {
+    fn collect(stream: TokenStream, buffer: &mut Vec<Token>) -> Result<(), TokenError> {
         for t in stream {
             match t {
                 proc_macro2::TokenTree::Group(group) => {
@@ -58,7 +58,7 @@ impl TokenBuffer {
                     let stream = group.stream();
 
                     buffer.push(Token::Group(group, 0));
-                    Self::collect(stream, buffer);
+                    Self::collect(stream, buffer)?;
 
                     let after_len = buffer.len();
                     let group_len = after_len - before_len - 1;
@@ -70,9 +70,13 @@ impl TokenBuffer {
                 }
                 proc_macro2::TokenTree::Ident(ident) => buffer.push(Token::Ident(ident)),
                 proc_macro2::TokenTree::Punct(punct) => buffer.push(Token::Punct(punct)),
-                proc_macro2::TokenTree::Literal(literal) => buffer.push(Token::Literal(literal)),
+                proc_macro2::TokenTree::Literal(literal) => {
+                    let literal = crate::token::parse_literal(literal)?;
+                    buffer.push(Token::Literal(literal))
+                }
             }
         }
+        Ok(())
     }
 
     pub fn as_slice<'a>(&'a self) -> TokenSlice<'a> {
@@ -144,7 +148,7 @@ impl<'a> TokenSlice<'a> {
         None
     }
 
-    pub fn literal(&self) -> Option<&'a Literal> {
+    pub fn literal(&self) -> Option<&'a Lit> {
         if let Some(Token::Literal(lit)) = self.cur() {
             Some(lit);
         }
@@ -187,9 +191,9 @@ impl<'a> TokenSlice<'a> {
     pub fn span(&self) -> Span {
         if let Some(c) = self.cur() {
             match c {
-                Token::Ident(ident) => ident.span(),
+                Token::Ident(ident) => ident.span().into(),
                 Token::Literal(literal) => literal.span(),
-                Token::Punct(punct) => punct.span(),
+                Token::Punct(punct) => punct.span().into(),
                 Token::Group(..) | Token::Back(_) => unreachable!(),
             }
         } else {
@@ -199,7 +203,7 @@ impl<'a> TokenSlice<'a> {
             let Token::Group(g, _) = (unsafe { self.cur.get().sub(count + 1).as_ref() }) else {
                 unreachable!()
             };
-            g.span_close()
+            g.span_close().into()
         }
     }
 }

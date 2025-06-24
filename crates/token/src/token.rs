@@ -1,6 +1,10 @@
+//! Token implementations.
 use crate::buffer::TokenSlice;
-use ast::Span;
+pub use proc_macro2::Ident;
 use proc_macro2::{Delimiter, Spacing};
+
+mod lit;
+pub use lit::{Lit, LitBool, LitInt, LitIntSuffix, LitStr, parse_literal};
 
 pub trait Token: Peek + Sized {
     const NAME: &'static str;
@@ -17,10 +21,10 @@ pub trait Peek: Sized {
 macro_rules! impl_keywords {
     ($($kw:ident => $type:ident),*$(,)?) => {
         $(
-            pub struct $type(pub Span);
+            pub struct $type(pub $crate::Span);
 
-            impl ::ast::Spanned for $type{
-                fn span(&self) -> Span{
+            impl $crate::Spanned for $type{
+                fn span(&self) -> $crate::Span{
                     self.0.clone()
                 }
             }
@@ -83,10 +87,10 @@ pub(crate) use T_keyword;
 
 macro_rules! impl_punct{
     ($([$punct:tt]=> $type:ident),*$(,)?) => {
-        $(pub struct $type(pub Span);
+        $(pub struct $type(pub $crate::Span);
 
-        impl ::ast::Spanned for $type{
-            fn span(&self) -> Span{
+        impl $crate::Spanned for $type{
+            fn span(&self) -> $crate::Span{
                 self.0.clone()
             }
         }
@@ -107,7 +111,7 @@ macro_rules! impl_punct{
                 let check_point = slice.clone();
                 slice.advance();
 
-                let mut span: Span = punct.span().into();
+                let mut span: $crate::Span = punct.span().into();
 
                 for i in 1..bytes.len() {
                     if punct.spacing() != Spacing::Joint {
@@ -167,14 +171,16 @@ macro_rules! impl_punct{
             }
         })*
 
-        macro_rules! impl_t_punct{
+        /// Macro used for token shorthands.
+        #[macro_export]
+        macro_rules! T{
             $(
                 ($punct) => {
                     $crate::token::$type
                 };
             )*
             ($t:tt) => {
-                crate::token::T_keyword!($t)
+                $crate::token::T_keyword!($t)
             };
         }
     };
@@ -217,7 +223,6 @@ impl_punct! {
     [*] => Star,
     [*=] => StarEq,
 }
-pub(crate) use impl_t_punct as T;
 
 pub struct Paren;
 pub struct Bracket;

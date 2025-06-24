@@ -1,7 +1,7 @@
 use super::{Ast, Node, NodeId, NodeLibrary, NodeListId, Span};
 use common::render::IndentFormatter;
 use std::fmt;
-use syn::{Ident, Lit};
+use token::token::{Ident, Lit};
 
 pub struct AstRender<'a, L, N> {
     ast: &'a Ast<L>,

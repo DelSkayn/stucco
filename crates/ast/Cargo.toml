@@ -4,11 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-print = ["syn/extra-traits"]
+print = []
 span-locations = ["proc-macro2/span-locations"]
 default = ["print"]
 
 [dependencies]
 common = { workspace = true }
-syn = { workspace = true, features = ["parsing","printing"] }
+token = { workspace = true }
+#syn = { workspace = true, features = ["parsing","printing"] }
 proc-macro2 = { workspace = true }

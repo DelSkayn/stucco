@@ -1,7 +1,4 @@
 use crate::resolve::{SymbolId, Symbols};
-use core::num;
-use std::{cell::Cell, collections::HashMap, fmt::Write, hash::Hash};
-
 use ast::{
     Ast, Block, Expr, Method, NodeId, Span,
     visit::{self, Visit},
@@ -11,7 +8,9 @@ use common::{
     id::{Id, IdVec},
     iter::IterExt,
 };
-use syn::Ident;
+use core::num;
+use std::{cell::Cell, collections::HashMap, fmt::Write, hash::Hash};
+use token::token::{Ident, Lit, LitIntSuffix};
 
 id!(TyId);
 id!(ConstraintId);
@@ -28,7 +27,7 @@ pub enum TypeError {
     UnknownMethod(Ident, TyId),
     InvalidArity(NodeId<Method>, usize),
     UnknownType(NodeId<ast::Type>),
-    LiteralOverflow(NodeId<ast::Lit>, TyId),
+    LiteralOverflow(NodeId<Lit>, TyId),
     CantInfer(TyId),
 }
 
@@ -259,7 +258,7 @@ impl Types {
                     )
                 };
                 match ast[*l] {
-                    syn::Lit::Int(ref lit_int) => match p {
+                    Lit::Int(ref lit_int) => match p {
                         PrimTy::U64 | PrimTy::Usize => {
                             if lit_int.base10_digits().parse::<u64>().is_err() {
                                 return Err(TypeError::LiteralOverflow(*l, ty));
@@ -302,7 +301,7 @@ impl Types {
                         }
                         x => panic!("int literal not an int: {x:?}"),
                     },
-                    syn::Lit::Float(ref lit_float) => match p {
+                    Lit::Float(ref lit_float) => match p {
                         PrimTy::F64 => {
                             if lit_float.base10_digits().parse::<f64>().is_err() {
                                 return Err(TypeError::LiteralOverflow(*l, ty));
@@ -824,29 +823,34 @@ impl<'a> Visit for InferUpPass<'a> {
             ast::Expr::Index(node_id) => todo!(),
             ast::Expr::Literal(node_id) => {
                 match ast[node_id] {
-                    syn::Lit::Int(ref lit_int) => {
-                        match lit_int.suffix() {
-                            "i64" => self
+                    Lit::Int(ref lit_int) => match lit_int.suffix() {
+                        LitIntSuffix::I64 => self
+                            .ty
+                            .expr_to_type
+                            .insert_fill_default(e, Some(Types::I64_ID)),
+                        LitIntSuffix::U64 => self
+                            .ty
+                            .expr_to_type
+                            .insert_fill_default(e, Some(Types::U64_ID)),
+                        LitIntSuffix::Usize => self
+                            .ty
+                            .expr_to_type
+                            .insert_fill_default(e, Some(Types::USIZE_ID)),
+                        LitIntSuffix::Isize => self
+                            .ty
+                            .expr_to_type
+                            .insert_fill_default(e, Some(Types::ISIZE_ID)),
+                        LitIntSuffix::None => {
+                            let ty_var = self
                                 .ty
-                                .expr_to_type
-                                .insert_fill_default(e, Some(Types::I64_ID)),
-                            "u64" => self
-                                .ty
-                                .expr_to_type
-                                .insert_fill_default(e, Some(Types::U64_ID)),
-                            "" => {
-                                let ty_var = self
-                                    .ty
-                                    .type_graph
-                                    .push(Ty::Var(Narrowing::Integer, Cell::new(None)))
-                                    .unwrap();
-                                self.ty.expr_to_type.insert_fill_default(e, Some(ty_var));
-                            }
-                            // Should have been filtered out by the parser.
-                            _ => unreachable!(),
+                                .type_graph
+                                .push(Ty::Var(Narrowing::Integer, Cell::new(None)))
+                                .unwrap();
+                            self.ty.expr_to_type.insert_fill_default(e, Some(ty_var));
                         }
-                    }
-                    syn::Lit::Float(ref lit_float) => {
+                    },
+                    /*
+                    Lit::Float(ref lit_float) => {
                         match lit_float.suffix() {
                             "f64" => self
                                 .ty
@@ -859,12 +863,12 @@ impl<'a> Visit for InferUpPass<'a> {
                             // Should have been filtered out by the parser.
                             _ => unreachable!(),
                         }
-                    }
-                    syn::Lit::Bool(_) => self
+                    }*/
+                    Lit::Bool(_) => self
                         .ty
                         .expr_to_type
                         .insert_fill_default(e, Some(Types::BOOL_ID)),
-                    _ => unreachable!(),
+                    _ => todo!(),
                 }
             }
             ast::Expr::Symbol(node_id) => {

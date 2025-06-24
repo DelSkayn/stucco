@@ -4,7 +4,7 @@ use crate::{
     TypeReference, TypeTuple, UnaryExpr, Variant, Variation, VariationImmediate, VariationSlot,
     While,
 };
-use syn::{Ident, Lit};
+use token::token::{Ident, Lit};
 
 macro_rules! implement_visitor{
 	($(fn $name:ident($this:ident, $ast:ident, $node:ident: $node_ty:ty) -> $res:ident{

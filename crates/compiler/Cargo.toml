@@ -7,7 +7,8 @@ edition = "2024"
 ast = { workspace = true, features = ["span-locations"] }
 bitflags = "2.9.1"
 common = { workspace = true }
-syn = { workspace = true ,default-features = false }
+token = { workspace = true }
+#syn = { workspace = true ,default-features = false }
 
 [dev-dependencies]
 parser = { workspace = true }
