@@ -2,7 +2,8 @@ use crate::{Span, Spanned as _, TokenError, token::Lit};
 use proc_macro2::{Delimiter, Group, Ident, Punct, TokenStream};
 use std::{cell::Cell, fmt, marker::PhantomData, ptr::NonNull};
 
-pub enum Token {
+#[derive(Debug)]
+pub enum TokenType {
     Ident(Ident),
     Literal(Lit),
     Punct(Punct),
@@ -10,20 +11,20 @@ pub enum Token {
     Back(usize),
 }
 
-impl fmt::Display for Token {
+impl fmt::Display for TokenType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Token::Ident(ident) => ident.fmt(f),
-            Token::Literal(literal) => literal.fmt(f),
-            Token::Punct(punct) => punct.fmt(f),
-            Token::Group(group, _) => group.fmt(f),
-            Token::Back(_) => writeln!(f, "ending"),
+            TokenType::Ident(ident) => ident.fmt(f),
+            TokenType::Literal(literal) => literal.fmt(f),
+            TokenType::Punct(punct) => punct.fmt(f),
+            TokenType::Group(group, _) => group.fmt(f),
+            TokenType::Back(_) => writeln!(f, "ending"),
         }
     }
 }
 
 pub struct TokenBuffer {
-    tokens: Box<[Token]>,
+    tokens: Box<[TokenType]>,
 }
 
 impl TokenBuffer {
@@ -31,7 +32,7 @@ impl TokenBuffer {
         let mut buffer = Vec::new();
 
         // Buffer token to handle the empty case consistantly
-        buffer.push(Token::Group(
+        buffer.push(TokenType::Group(
             Group::new(Delimiter::None, TokenStream::new()),
             0,
         ));
@@ -39,8 +40,8 @@ impl TokenBuffer {
         Self::collect(stream, &mut buffer)?;
 
         let len = buffer.len();
-        buffer.push(Token::Back(len));
-        let Token::Group(_, ref mut group_len) = buffer[0] else {
+        buffer.push(TokenType::Back(len));
+        let TokenType::Group(_, ref mut group_len) = buffer[0] else {
             unreachable!()
         };
         *group_len = len;
@@ -50,29 +51,29 @@ impl TokenBuffer {
         })
     }
 
-    fn collect(stream: TokenStream, buffer: &mut Vec<Token>) -> Result<(), TokenError> {
+    fn collect(stream: TokenStream, buffer: &mut Vec<TokenType>) -> Result<(), TokenError> {
         for t in stream {
             match t {
                 proc_macro2::TokenTree::Group(group) => {
                     let before_len = buffer.len();
                     let stream = group.stream();
 
-                    buffer.push(Token::Group(group, 0));
+                    buffer.push(TokenType::Group(group, 0));
                     Self::collect(stream, buffer)?;
 
                     let after_len = buffer.len();
                     let group_len = after_len - before_len - 1;
-                    let Token::Group(_, ref mut len_ref) = buffer[before_len] else {
+                    let TokenType::Group(_, ref mut len_ref) = buffer[before_len] else {
                         unreachable!()
                     };
                     *len_ref = group_len;
-                    buffer.push(Token::Back(group_len))
+                    buffer.push(TokenType::Back(group_len))
                 }
-                proc_macro2::TokenTree::Ident(ident) => buffer.push(Token::Ident(ident)),
-                proc_macro2::TokenTree::Punct(punct) => buffer.push(Token::Punct(punct)),
+                proc_macro2::TokenTree::Ident(ident) => buffer.push(TokenType::Ident(ident)),
+                proc_macro2::TokenTree::Punct(punct) => buffer.push(TokenType::Punct(punct)),
                 proc_macro2::TokenTree::Literal(literal) => {
                     let literal = crate::token::parse_literal(literal)?;
-                    buffer.push(Token::Literal(literal))
+                    buffer.push(TokenType::Literal(literal))
                 }
             }
         }
@@ -88,13 +89,13 @@ impl TokenBuffer {
 
 #[derive(Clone)]
 pub struct TokenSlice<'a> {
-    cur: Cell<NonNull<Token>>,
-    end: NonNull<Token>,
-    _marker: PhantomData<&'a Token>,
+    cur: Cell<NonNull<TokenType>>,
+    end: NonNull<TokenType>,
+    _marker: PhantomData<&'a TokenType>,
 }
 
 impl<'a> TokenSlice<'a> {
-    fn from_slice(tokens: &'a [Token]) -> Self {
+    fn from_slice(tokens: &'a [TokenType]) -> Self {
         let range = tokens.as_ptr_range();
         let cur = NonNull::new(range.start as *mut _).unwrap_or_else(NonNull::dangling);
         let end = NonNull::new(range.end as *mut _).unwrap_or_else(NonNull::dangling);
@@ -105,7 +106,7 @@ impl<'a> TokenSlice<'a> {
         }
     }
 
-    pub fn cur(&self) -> Option<&'a Token> {
+    pub fn cur(&self) -> Option<&'a TokenType> {
         if self.is_empty() {
             None
         } else {
@@ -142,28 +143,31 @@ impl<'a> TokenSlice<'a> {
     }
 
     pub fn ident(&self) -> Option<&'a Ident> {
-        if let Some(Token::Ident(ident)) = self.cur() {
-            Some(ident);
+        if let Some(TokenType::Ident(ident)) = self.cur() {
+            Some(ident)
+        } else {
+            None
         }
-        None
     }
 
     pub fn literal(&self) -> Option<&'a Lit> {
-        if let Some(Token::Literal(lit)) = self.cur() {
-            Some(lit);
+        if let Some(TokenType::Literal(lit)) = self.cur() {
+            Some(lit)
+        } else {
+            None
         }
-        None
     }
 
     pub fn punct(&self) -> Option<&'a Punct> {
-        if let Some(Token::Punct(punct)) = self.cur() {
-            return Some(punct);
+        if let Some(TokenType::Punct(punct)) = self.cur() {
+            Some(punct)
+        } else {
+            None
         }
-        None
     }
 
     pub fn group(&self) -> Option<(&'a Group, Self)> {
-        if let Some(Token::Group(group, len)) = self.cur() {
+        if let Some(TokenType::Group(group, len)) = self.cur() {
             let new_cur = unsafe { self.cur.get().add(1) };
             let group_slice = TokenSlice {
                 cur: Cell::new(new_cur),
@@ -176,7 +180,7 @@ impl<'a> TokenSlice<'a> {
     }
 
     pub fn advance_group(&self) {
-        let Some(Token::Group(_, len)) = self.cur() else {
+        let Some(TokenType::Group(_, len)) = self.cur() else {
             panic!(
                 "Tried to advance past a group, while the current token wasn't the start of a group"
             )
@@ -191,16 +195,24 @@ impl<'a> TokenSlice<'a> {
     pub fn span(&self) -> Span {
         if let Some(c) = self.cur() {
             match c {
-                Token::Ident(ident) => ident.span().into(),
-                Token::Literal(literal) => literal.span(),
-                Token::Punct(punct) => punct.span().into(),
-                Token::Group(..) | Token::Back(_) => unreachable!(),
+                TokenType::Ident(ident) => ident.span().into(),
+                TokenType::Literal(literal) => literal.span(),
+                TokenType::Punct(punct) => punct.span().into(),
+                TokenType::Back(count) => {
+                    let TokenType::Group(g, _) =
+                        (unsafe { self.cur.get().sub(count + 1).as_ref() })
+                    else {
+                        unreachable!()
+                    };
+                    g.span_close().into()
+                }
+                TokenType::Group(g, _) => g.span_open().into(),
             }
         } else {
-            let Token::Back(count) = (unsafe { self.end.as_ref() }) else {
+            let TokenType::Back(count) = (unsafe { self.end.as_ref() }) else {
                 unreachable!()
             };
-            let Token::Group(g, _) = (unsafe { self.cur.get().sub(count + 1).as_ref() }) else {
+            let TokenType::Group(g, _) = (unsafe { self.cur.get().sub(count + 1).as_ref() }) else {
                 unreachable!()
             };
             g.span_close().into()
@@ -208,13 +220,13 @@ impl<'a> TokenSlice<'a> {
     }
 }
 
-pub struct FormatToken<'a>(Option<&'a Token>);
+pub struct FormatToken<'a>(Option<&'a TokenType>);
 impl fmt::Display for FormatToken<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(x) = self.0 {
-            writeln!(f, "{x}")
+            write!(f, "{x}")
         } else {
-            writeln!(f, "eof")
+            write!(f, "eof")
         }
     }
 }

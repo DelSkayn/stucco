@@ -1,18 +1,17 @@
-use ast::{Ast, AstSpanned, Node, NodeId, NodeListId, Span, Spanned};
-use buffer::{TokenBuffer, TokenSlice};
+use ast::{Ast, AstSpanned, Node, NodeId, NodeListId};
 use error::Error;
-use proc_macro2::{Delimiter, Ident, TokenStream, extra::DelimSpan};
+use proc_macro2::TokenStream;
 use std::{
     fmt,
     ops::{Deref, DerefMut},
     result::Result as StdResult,
     str::FromStr,
 };
+use token::{
+    Peek, Span, T, Token, TokenBuffer, TokenSlice, TokenType,
+    token::{DelimSpan, Delimiter},
+};
 
-pub(crate) mod token;
-use token::{Peek, T, Token};
-
-mod buffer;
 pub mod error;
 mod expr;
 mod prime;
@@ -24,45 +23,8 @@ mod variant;
 
 pub type Result<T> = StdResult<T, error::Error>;
 
-pub trait Parse: Sized {
+trait Parse: Sized {
     fn parse(parser: &mut Parser) -> Result<Self>;
-}
-
-pub trait ParsePush: Sized {
-    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>>;
-}
-
-impl<P: Parse + ast::Node> ParsePush for P {
-    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
-        let res = P::parse(parser)?;
-        parser.push(res)
-    }
-}
-
-impl Parse for Ident {
-    fn parse(parser: &mut Parser) -> Result<Self> {
-        if let Some(ident) = parser.slice.ident() {
-            return Ok(ident.clone());
-        }
-        Err(parser.error(format_args!(
-            "Unexpected token '{}' expected an identifier",
-            parser.slice.format_cur()
-        )))
-    }
-}
-
-impl<T: Token> Parse for T {
-    fn parse(parser: &mut Parser) -> Result<Self> {
-        if let Some(t) = T::lex(&parser.slice) {
-            Ok(t)
-        } else {
-            Err(parser.error(format_args!(
-                "Unexpected token '{}' expected an {}",
-                parser.slice.format_cur(),
-                T::NAME
-            )))
-        }
-    }
 }
 
 pub trait ParseFunc: Sized {
@@ -85,8 +47,10 @@ pub struct Parser<'a, 'b> {
 }
 
 impl<'a, 'b> Parser<'a, 'b> {
-    pub fn parse_stream<P: ParsePush>(token_stream: TokenStream) -> Result<(NodeId<P>, Ast)> {
-        Self::parse_inner(token_stream, P::parse_push)
+    pub fn parse_stream<P: Parse + ast::Node>(
+        token_stream: TokenStream,
+    ) -> Result<(NodeId<P>, Ast)> {
+        Self::parse_inner(token_stream, |p| p.parse_push::<P>())
     }
 
     pub fn parse_stream_func<F: ParseFunc>(
@@ -96,9 +60,9 @@ impl<'a, 'b> Parser<'a, 'b> {
         Self::parse_inner(token_stream, |p| func.parse_func(p))
     }
 
-    pub fn parse_str<P: ParsePush>(str: &str) -> Result<(NodeId<P>, Ast)> {
+    pub fn parse_str<P: Parse + ast::Node>(str: &str) -> Result<(NodeId<P>, Ast)> {
         let token_stream = TokenStream::from_str(str).unwrap();
-        Self::parse_inner(token_stream, P::parse_push)
+        Self::parse_inner(token_stream, |p| p.parse_push::<P>())
     }
 
     pub fn parse_str_func<F: ParseFunc>(str: &str, func: F) -> Result<(F::Result, Ast)> {
@@ -110,7 +74,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     where
         F: FnOnce(&mut Parser) -> Result<R>,
     {
-        let tb = TokenBuffer::from_stream(stream);
+        let tb = TokenBuffer::from_stream(stream)?;
         let slice = tb.as_slice();
         let mut ast = Ast::new();
         let mut parser = Parser {
@@ -140,8 +104,9 @@ impl<'a, 'b> Parser<'a, 'b> {
         self.slice.span().into()
     }
 
-    pub fn parse_push<P: ParsePush>(&mut self) -> Result<NodeId<P>> {
-        P::parse_push(self)
+    pub fn parse_push<P: Parse + ast::Node>(&mut self) -> Result<NodeId<P>> {
+        let p = P::parse(self)?;
+        self.push(p)
     }
 
     pub fn parse<P: Parse>(&mut self) -> Result<P> {
@@ -184,6 +149,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         F: FnOnce(&mut Parser) -> Result<R>,
     {
         let Some((group, slice)) = self.slice.group() else {
+            println!("{}", std::backtrace::Backtrace::force_capture());
             let delim = match delim {
                 Delimiter::Parenthesis => "(",
                 Delimiter::Brace => "{",
@@ -191,20 +157,20 @@ impl<'a, 'b> Parser<'a, 'b> {
                 Delimiter::None => panic!("don't parse on none delimiter"),
             };
             return Err(self.error(format_args!(
-                "Unexpected token '{}' expected {}",
+                "Unexpected token '{}' expected '{}'",
                 self.slice.format_cur(),
                 delim
             )));
         };
         if group.delimiter() != delim {
             return Err(self.error(format_args!(
-                "invalid delimiter, expected {}",
+                "invalid delimiter, expected '{}'",
                 Self::delimiter_to_expected(delim)
             )));
         }
 
         let mut parser = Parser {
-            slice: slice,
+            slice,
             ast: self.ast,
         };
         let res = f(&mut parser);
@@ -237,20 +203,20 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     pub fn parse_terminated<P, D>(&mut self) -> Result<Option<NodeListId<P>>>
     where
-        P: ParsePush + Node,
-        D: Parse,
+        P: Parse + Node,
+        D: Token,
     {
         let mut head = None;
         let mut current = None;
         while !self.is_empty() {
-            let v = P::parse_push(self)?;
+            let v = self.parse_push()?;
             self.push_list(&mut head, &mut current, v)?;
 
             if self.is_empty() {
                 break;
             }
 
-            self.parse::<D>()?;
+            self.expect::<D>()?;
         }
         Ok(head)
     }
@@ -266,7 +232,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     pub fn peek_group(&self, delim: Delimiter) -> bool {
-        let Some(buffer::Token::Group(g, _)) = self.slice.cur() else {
+        let Some(TokenType::Group(g, _)) = self.slice.cur() else {
             return false;
         };
         g.delimiter() == delim
@@ -274,6 +240,18 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     pub fn eat<T: Token>(&self) -> Option<T> {
         T::lex(&self.slice)
+    }
+
+    pub fn expect<T: Token>(&self) -> Result<T> {
+        if let Some(t) = T::lex(&self.slice) {
+            Ok(t)
+        } else {
+            Err(self.error(format_args!(
+                "Unexpected token '{}' expected '{}'",
+                self.slice.format_cur(),
+                T::NAME
+            )))
+        }
     }
 }
 
@@ -293,7 +271,7 @@ impl DerefMut for Parser<'_, '_> {
 
 /// parses a module in the form of `mod bla { stencil foo() { .. } }`
 pub fn parse_wrapped_module(parser: &mut Parser) -> Result<NodeId<ast::Module>> {
-    let span = parser.parse::<T![mod]>()?.0;
+    let span = parser.expect::<T![mod]>()?.0;
     let sym = parser.parse_push()?;
 
     let mut end_span = None;
@@ -315,11 +293,11 @@ pub fn parse_wrapped_module(parser: &mut Parser) -> Result<NodeId<ast::Module>> 
     let end_span = end_span.unwrap();
     let span = span.try_join(end_span);
 
-    Ok(parser.push(ast::Module {
+    parser.push(ast::Module {
         sym: Some(sym),
         stencils: functions,
         span,
-    })?)
+    })
 }
 
 /// parses a module in the form of `stencil foo() { .. }` i.e. imported from an external file.
@@ -344,9 +322,9 @@ pub fn parse_external_module(parser: &mut Parser) -> Result<NodeId<ast::Module>>
         start_span
     };
 
-    Ok(parser.push(ast::Module {
+    parser.push(ast::Module {
         sym: None,
         stencils: head,
         span,
-    })?)
+    })
 }

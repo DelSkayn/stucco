@@ -17,6 +17,7 @@ use inkwell::{
     values::{AnyValue, LLVMTailCallKind},
 };
 pub use target::Target;
+use token::token::{IntType, Lit};
 use util::{NonBasicTypeEnum, try_any_to_basic};
 use value::Value;
 use wrapper::GlobalValueExt;
@@ -692,66 +693,41 @@ impl<'ctx, 't> VariationGen<'ctx, 't> {
         }
     }
 
-    fn gen_lit(&self, lit: NodeId<ast::Lit>, expr: NodeId<ast::Expr>) -> Value<'ctx> {
+    fn gen_lit(&self, lit: NodeId<Lit>, expr: NodeId<ast::Expr>) -> Value<'ctx> {
         match &self.ast[lit] {
-            ast::Lit::Str(_) => todo!(),
-            ast::Lit::ByteStr(_) => todo!(),
-            ast::Lit::CStr(_) => todo!(),
-            ast::Lit::Byte(_) => todo!(),
-            ast::Lit::Char(_) => todo!(),
-            ast::Lit::Int(lit_int) => {
+            Lit::Str(_) => todo!(),
+            Lit::Int(lit_int) => {
+                let int_value = match lit_int.value() {
+                    IntType::Signed(x) => x as u64,
+                    IntType::Unsigned(x) => x,
+                };
+
                 let ty = self.types.find_type_for_expr(expr).unwrap();
                 let v = match self.types.type_graph[ty] {
                     Ty::Prim(p) => match p {
-                        PrimTy::Usize | PrimTy::U64 => self
-                            .context
-                            .i64_type()
-                            .const_int(lit_int.base10_parse().unwrap(), false),
-                        PrimTy::U32 => self
-                            .context
-                            .i32_type()
-                            .const_int(lit_int.base10_parse().unwrap(), false),
-                        PrimTy::U16 => self
-                            .context
-                            .i16_type()
-                            .const_int(lit_int.base10_parse().unwrap(), false),
-                        PrimTy::U8 => self
-                            .context
-                            .i8_type()
-                            .const_int(lit_int.base10_parse().unwrap(), false),
+                        PrimTy::Usize | PrimTy::U64 => {
+                            self.context.i64_type().const_int(int_value, false)
+                        }
+                        PrimTy::U32 => self.context.i32_type().const_int(int_value, false),
+                        PrimTy::U16 => self.context.i16_type().const_int(int_value, false),
+                        PrimTy::U8 => self.context.i8_type().const_int(int_value, false),
                         PrimTy::Isize | PrimTy::I64 | PrimTy::I32 | PrimTy::I16 | PrimTy::I8 => {
                             todo!()
                         }
-                        _ => panic!(),
+                        _ => unreachable!(),
                     },
-                    _ => panic!(),
-                };
-                v.into()
-            }
-            ast::Lit::Float(lit_float) => {
-                let ty = self.types.find_type_for_expr(expr).unwrap();
-                let v = match self.types.type_graph[ty] {
-                    Ty::Prim(PrimTy::F32) => {
-                        let number = lit_float.base10_parse::<f64>().unwrap();
-                        self.context.f32_type().const_float(number)
-                    }
-                    Ty::Prim(PrimTy::F64) => {
-                        let number = lit_float.base10_parse::<f64>().unwrap();
-                        self.context.f32_type().const_float(number)
-                    }
                     _ => unreachable!(),
                 };
                 v.into()
             }
-            ast::Lit::Bool(lit_bool) => {
-                if lit_bool.value() {
+
+            Lit::Bool(lit_bool) => {
+                if lit_bool.value {
                     self.context.bool_type().const_int(1, false).into()
                 } else {
                     self.context.bool_type().const_int(0, false).into()
                 }
             }
-            ast::Lit::Verbatim(_) => todo!(),
-            _ => todo!(),
         }
     }
 }

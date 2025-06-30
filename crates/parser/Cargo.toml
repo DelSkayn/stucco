@@ -9,6 +9,7 @@ span-locations = ["ast/span-locations"]
 nightly = []
 
 [dependencies]
+token = { workspace = true }
 ast = { workspace = true }
 common = { workspace = true }
 proc-macro2 = { workspace = true }

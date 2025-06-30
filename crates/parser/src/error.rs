@@ -1,5 +1,6 @@
-use ast::{PushNodeError, Span};
+use ast::PushNodeError;
 pub use imp::render;
+use token::{Span, TokenError};
 
 #[derive(Debug)]
 pub struct Error {
@@ -12,6 +13,15 @@ impl From<PushNodeError> for Error {
         Error {
             span: Span::call_site(),
             message: "Too many AST nodes, source file too long".to_string(),
+        }
+    }
+}
+
+impl From<TokenError> for Error {
+    fn from(e: TokenError) -> Self {
+        Error {
+            message: "Invalid token".to_string(),
+            span: e.span,
         }
     }
 }

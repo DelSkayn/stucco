@@ -288,6 +288,7 @@ dependencies = [
  "stucco_common",
  "stucco_compiler",
  "stucco_parser",
+ "stucco_token",
 ]
 
 [[package]]
@@ -323,6 +324,7 @@ dependencies = [
  "proc-macro2",
  "stucco_ast",
  "stucco_common",
+ "stucco_token",
 ]
 
 [[package]]

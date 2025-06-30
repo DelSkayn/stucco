@@ -1,6 +1,6 @@
 use crate::resolve::{SymbolId, Symbols};
 use ast::{
-    Ast, Block, Expr, Method, NodeId, Span,
+    Ast, Block, Expr, Method, NodeId,
     visit::{self, Visit},
 };
 use common::{
@@ -8,9 +8,11 @@ use common::{
     id::{Id, IdVec},
     iter::IterExt,
 };
-use core::num;
 use std::{cell::Cell, collections::HashMap, fmt::Write, hash::Hash};
-use token::token::{Ident, Lit, LitIntSuffix};
+use token::{
+    Span,
+    token::{Ident, IntType, Lit, LitIntSuffix},
+};
 
 id!(TyId);
 id!(ConstraintId);
@@ -260,47 +262,80 @@ impl Types {
                 match ast[*l] {
                     Lit::Int(ref lit_int) => match p {
                         PrimTy::U64 | PrimTy::Usize => {
-                            if lit_int.base10_digits().parse::<u64>().is_err() {
+                            if matches!(lit_int.value(), IntType::Signed(_)) {
                                 return Err(TypeError::LiteralOverflow(*l, ty));
                             }
                         }
                         PrimTy::Isize | PrimTy::I64 => {
-                            if lit_int.base10_digits().parse::<i64>().is_err() {
-                                return Err(TypeError::LiteralOverflow(*l, ty));
+                            if let IntType::Unsigned(x) = lit_int.value() {
+                                if x > i64::MAX as u64 {
+                                    return Err(TypeError::LiteralOverflow(*l, ty));
+                                }
                             }
                         }
-                        PrimTy::U32 => {
-                            if lit_int.base10_digits().parse::<u32>().is_err() {
-                                return Err(TypeError::LiteralOverflow(*l, ty));
+                        PrimTy::U32 => match lit_int.value() {
+                            IntType::Signed(_) => return Err(TypeError::LiteralOverflow(*l, ty)),
+                            IntType::Unsigned(x) => {
+                                if x > u32::MAX as u64 {
+                                    return Err(TypeError::LiteralOverflow(*l, ty));
+                                }
                             }
-                        }
-                        PrimTy::I32 => {
-                            if lit_int.base10_digits().parse::<i32>().is_err() {
-                                return Err(TypeError::LiteralOverflow(*l, ty));
+                        },
+                        PrimTy::U16 => match lit_int.value() {
+                            IntType::Signed(_) => return Err(TypeError::LiteralOverflow(*l, ty)),
+                            IntType::Unsigned(x) => {
+                                if x > u16::MAX as u64 {
+                                    return Err(TypeError::LiteralOverflow(*l, ty));
+                                }
                             }
-                        }
-                        PrimTy::U16 => {
-                            if lit_int.base10_digits().parse::<u16>().is_err() {
-                                return Err(TypeError::LiteralOverflow(*l, ty));
+                        },
+                        PrimTy::U8 => match lit_int.value() {
+                            IntType::Signed(_) => return Err(TypeError::LiteralOverflow(*l, ty)),
+                            IntType::Unsigned(x) => {
+                                if x > u8::MAX as u64 {
+                                    return Err(TypeError::LiteralOverflow(*l, ty));
+                                }
                             }
-                        }
-                        PrimTy::I16 => {
-                            if lit_int.base10_digits().parse::<i16>().is_err() {
-                                return Err(TypeError::LiteralOverflow(*l, ty));
+                        },
+                        PrimTy::I32 => match lit_int.value() {
+                            IntType::Signed(x) => {
+                                if x < i32::MIN as i64 {
+                                    return Err(TypeError::LiteralOverflow(*l, ty));
+                                }
                             }
-                        }
-                        PrimTy::U8 => {
-                            if lit_int.base10_digits().parse::<u8>().is_err() {
-                                return Err(TypeError::LiteralOverflow(*l, ty));
+                            IntType::Unsigned(x) => {
+                                if x > i32::MAX as u64 {
+                                    return Err(TypeError::LiteralOverflow(*l, ty));
+                                }
                             }
-                        }
-                        PrimTy::I8 => {
-                            if lit_int.base10_digits().parse::<i8>().is_err() {
-                                return Err(TypeError::LiteralOverflow(*l, ty));
+                        },
+                        PrimTy::I16 => match lit_int.value() {
+                            IntType::Signed(x) => {
+                                if x < i16::MIN as i64 {
+                                    return Err(TypeError::LiteralOverflow(*l, ty));
+                                }
                             }
-                        }
+                            IntType::Unsigned(x) => {
+                                if x > i16::MAX as u64 {
+                                    return Err(TypeError::LiteralOverflow(*l, ty));
+                                }
+                            }
+                        },
+                        PrimTy::I8 => match lit_int.value() {
+                            IntType::Signed(x) => {
+                                if x < i8::MIN as i64 {
+                                    return Err(TypeError::LiteralOverflow(*l, ty));
+                                }
+                            }
+                            IntType::Unsigned(x) => {
+                                if x > i8::MAX as u64 {
+                                    return Err(TypeError::LiteralOverflow(*l, ty));
+                                }
+                            }
+                        },
                         x => panic!("int literal not an int: {x:?}"),
                     },
+                    /*
                     Lit::Float(ref lit_float) => match p {
                         PrimTy::F64 => {
                             if lit_float.base10_digits().parse::<f64>().is_err() {
@@ -314,6 +349,7 @@ impl Types {
                         }
                         _ => panic!(),
                     },
+                    */
                     _ => return Ok(()),
                 }
             } else {

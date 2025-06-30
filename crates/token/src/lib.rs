@@ -4,8 +4,7 @@ pub mod token;
 
 use std::{error::Error, fmt};
 
-pub use buffer::TokenBuffer;
-pub use proc_macro2::Ident;
+pub use buffer::{TokenBuffer, TokenSlice, TokenType};
 pub use span::{Span, Spanned};
 pub use token::{Peek, Token};
 

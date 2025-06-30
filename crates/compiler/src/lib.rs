@@ -1,6 +1,7 @@
-use ast::{Ast, NodeId, Span};
+use ast::{Ast, NodeId};
 use infer::TypeError;
 use std::{error, fmt};
+use token::Span;
 
 pub mod infer;
 pub mod resolve;

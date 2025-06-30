@@ -37,8 +37,8 @@ impl Token for LitStr {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LitBool {
-    value: bool,
-    span: Span,
+    pub value: bool,
+    pub span: Span,
 }
 impl Spanned for LitBool {
     fn span(&self) -> crate::Span {

@@ -9,7 +9,7 @@ use ast::{
 };
 use ast::{AstSpanned, Stencil};
 use common::{id, id::IdVec};
-use syn::Ident;
+use token::token::Ident;
 
 use crate::Error;
 

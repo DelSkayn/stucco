@@ -1,10 +1,11 @@
-use ast::{NodeId, Spanned as _, Variant};
+use ast::{NodeId, Variant};
+use token::T;
 
-use crate::{ParsePush, Parser, Result, T};
+use crate::{Parse, Parser, Result};
 
-impl ParsePush for ast::Stencil {
-    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
-        let span = parser.parse::<T![stencil]>()?.0;
+impl Parse for ast::Stencil {
+    fn parse(parser: &mut Parser) -> Result<Self> {
+        let span = parser.expect::<T![stencil]>()?.0;
         let sym = parser.parse_push()?;
 
         let parameters =
@@ -27,7 +28,7 @@ impl ParsePush for ast::Stencil {
         let body = parser.parse_push()?;
         let body = parser.push(ast::Expr::Block(body))?;
 
-        parser.push(ast::Stencil {
+        Ok(ast::Stencil {
             sym,
             parameters,
             span,
@@ -38,13 +39,13 @@ impl ParsePush for ast::Stencil {
     }
 }
 
-impl ParsePush for ast::Parameter {
-    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
+impl Parse for ast::Parameter {
+    fn parse(parser: &mut Parser) -> Result<Self> {
         let span = parser.span();
         let sym = parser.parse_push()?;
-        parser.parse::<T![:]>()?;
+        parser.expect::<T![:]>()?;
         let ty = parser.parse_push()?;
 
-        parser.push(Self { sym, ty, span })
+        Ok(Self { sym, ty, span })
     }
 }

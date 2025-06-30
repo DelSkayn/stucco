@@ -5,8 +5,8 @@ pub use ast::Node;
 use ast::NodeLibrary;
 pub use ast::{AstSpanned, NodeId, NodeList, NodeListId, PushNodeError};
 use common::id::IdSet;
-pub use token::{
-    Span, Spanned,
+use token::{
+    Span,
     token::{Ident, Lit},
 };
 

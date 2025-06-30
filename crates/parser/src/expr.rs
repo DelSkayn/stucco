@@ -1,14 +1,11 @@
-use ast::{BinOp, NodeId, Spanned as _, UnOp};
+use ast::{BinOp, UnOp};
 use proc_macro2::Delimiter;
 
-use crate::{
-    ParsePush, Parser, Result,
-    prime::parse_prime,
-    token::{self, T},
-};
+use crate::{Parse, Parser, Result, prime::parse_prime};
+use ::token::{T, token};
 
-impl ParsePush for ast::Expr {
-    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
+impl Parse for ast::Expr {
+    fn parse(parser: &mut Parser) -> Result<Self> {
         parse_binding(parser, BindingPower::Base)
     }
 }
@@ -47,13 +44,15 @@ macro_rules! parse_bin_op {
                     }
                     let span = t.0;
                     let right = parse_binding($parser, $bp)?;
-                    let new_expr = $parser.push(ast::BinaryExpr{
-                        left: $bind,
+                    let right = $parser.push(right)?;
+                    let new_expr = ast::BinaryExpr{
+                        left: $parser.push($bind)?,
                         op: $op,
                         right,
                         span,
-                    })?;
-                    $bind = $parser.push(ast::Expr::Binary(new_expr))?;
+                    };
+                    let new_expr = $parser.push(new_expr)?;
+                    $bind = ast::Expr::Binary(new_expr);
                     continue
                 }
             )*)*
@@ -61,7 +60,7 @@ macro_rules! parse_bin_op {
     };
 }
 
-fn parse_binding(parser: &mut Parser, bp: BindingPower) -> Result<NodeId<ast::Expr>> {
+fn parse_binding(parser: &mut Parser, bp: BindingPower) -> Result<ast::Expr> {
     let mut lhs = if bp <= BindingPower::Unary {
         parse_unary(parser)?
     } else {
@@ -146,60 +145,63 @@ fn parse_binding(parser: &mut Parser, bp: BindingPower) -> Result<NodeId<ast::Ex
     Ok(lhs)
 }
 
-fn parse_unary(parser: &mut Parser) -> Result<NodeId<ast::Expr>> {
-    let (span, op) = if parser.peek::<T![!]>() {
-        let span = parser.parse::<T![!]>()?.0;
-        (span, UnOp::Not)
-    } else if parser.peek::<T![*]>() {
-        let span = parser.parse::<T![*]>()?.0;
-        (span, UnOp::Star)
-    } else if parser.peek::<T![*]>() {
-        let span = parser.parse::<T![-]>()?.0;
-        (span, UnOp::Minus)
+fn parse_unary(parser: &mut Parser) -> Result<ast::Expr> {
+    let (span, op) = if let Some(t) = parser.eat::<T![!]>() {
+        (t.0, UnOp::Not)
+    } else if let Some(t) = parser.eat::<T![*]>() {
+        (t.0, UnOp::Star)
+    } else if let Some(t) = parser.eat::<T![*]>() {
+        (t.0, UnOp::Minus)
     } else {
         return parse_prime(parser);
     };
 
     let left = parse_prime(parser)?;
+    let left = parser.push(left)?;
 
     let unary = parser.push(ast::UnaryExpr {
         op,
         span,
         expr: left,
     })?;
-    parser.push(ast::Expr::Unary(unary))
+    Ok(ast::Expr::Unary(unary))
 }
 
-fn parse_call(parser: &mut Parser, callee: NodeId<ast::Expr>) -> Result<NodeId<ast::Expr>> {
+fn parse_call(parser: &mut Parser, callee: ast::Expr) -> Result<ast::Expr> {
     let span = parser.span();
     let args = parser.parse_parenthesized(|parser| parser.parse_terminated::<_, T![,]>())?;
+    let callee = parser.push(callee)?;
     let call = parser.push(ast::Call {
         func: callee,
         args,
         span,
     })?;
-    parser.push(ast::Expr::Call(call))
+    Ok(ast::Expr::Call(call))
 }
 
-fn parse_dot(parser: &mut Parser, base: NodeId<ast::Expr>) -> Result<NodeId<ast::Expr>> {
-    let span = parser.parse::<T![.]>()?.0;
+fn parse_dot(parser: &mut Parser, base: ast::Expr) -> Result<ast::Expr> {
+    let span = parser.expect::<T![.]>()?.0;
     if parser.peek2::<token::Paren>() {
-        let ident = parser.parse_push()?;
+        let ident = parser.expect()?;
+        let ident = parser.push(ident)?;
         let args = parser.parse_parenthesized(|parser| parser.parse_terminated::<_, T![,]>())?;
+        let receiver = parser.push(base)?;
         let call = parser.push(ast::Method {
-            receiver: base,
+            receiver,
             name: ident,
             args,
             span,
         })?;
-        parser.push(ast::Expr::Method(call))
+        Ok(ast::Expr::Method(call))
     } else {
-        let ident = parser.parse_push()?;
+        let ident = parser.expect()?;
+        let ident = parser.push(ident)?;
+        let base = parser.push(base)?;
         let field = parser.push(ast::Field {
             base,
             field: ident,
             span,
         })?;
-        parser.push(ast::Expr::Field(field))
+        Ok(ast::Expr::Field(field))
     }
 }

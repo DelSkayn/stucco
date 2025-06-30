@@ -1,16 +1,50 @@
 //! Token implementations.
 use crate::buffer::TokenSlice;
-pub use proc_macro2::Ident;
-use proc_macro2::{Delimiter, Spacing};
+use proc_macro2::Spacing;
+pub use proc_macro2::{Delimiter, Ident, extra::DelimSpan};
 
 mod lit;
-pub use lit::{Lit, LitBool, LitInt, LitIntSuffix, LitStr, parse_literal};
+pub use lit::{IntType, Lit, LitBool, LitInt, LitIntSuffix, LitStr, parse_literal};
 
 pub trait Token: Peek + Sized {
     const NAME: &'static str;
 
     fn lex<'a>(slice: &TokenSlice<'a>) -> Option<Self>;
 }
+
+impl Peek for Ident {
+    fn peek(slice: &TokenSlice) -> bool {
+        slice.ident().is_some()
+    }
+}
+
+impl Token for Ident {
+    const NAME: &'static str = "identifier";
+
+    fn lex<'a>(slice: &TokenSlice<'a>) -> Option<Self> {
+        if let Some(ident) = slice.ident() {
+            slice.advance();
+            return Some(ident.clone());
+        } else {
+            None
+        }
+    }
+}
+
+/*
+impl Token for Lit{
+    const NAME = "literal";
+
+    fn lex<'a>(slice: &TokenSlice<'a>) -> Option<Self> {
+        if let Some(x) = slice.literal() {
+            slice.advance();
+            Some(x.clone())
+        }else{
+            None
+        }
+    }
+}
+*/
 
 pub trait Peek: Sized {
     //const LENGTH: usize;
@@ -50,11 +84,13 @@ macro_rules! impl_keywords {
                     let Some(ident) = slice.ident() else {
                         return false
                     };
-                    ident == stringify!($name)
+                    ident == stringify!($kw)
                 }
             }
         )*
 
+        #[doc(hidden)]
+        #[macro_export]
         macro_rules! T_keyword{
             $(
                 ($kw) => {
@@ -180,7 +216,7 @@ macro_rules! impl_punct{
                 };
             )*
             ($t:tt) => {
-                $crate::token::T_keyword!($t)
+                $crate::T_keyword!($t)
             };
         }
     };

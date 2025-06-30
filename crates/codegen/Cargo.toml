@@ -13,6 +13,7 @@ proc-macro = ["inkwell/llvm18-1-no-llvm-linking"]
 ast.workspace = true
 common.workspace = true
 compiler.workspace = true
+token.workspace = true
 
 # LLVM bindings
 inkwell = { version = "0.6.0", features = ["llvm18-1"] }

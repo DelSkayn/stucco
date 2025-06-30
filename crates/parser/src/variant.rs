@@ -1,9 +1,10 @@
-use crate::{ParsePush, Parser, Result, T};
-use ast::{NodeId, Variant, Variation, VariationImmediate, VariationSlot};
+use crate::{Parse, Parser, Result};
+use ast::{Variant, Variation, VariationImmediate, VariationSlot};
+use token::T;
 
-impl ParsePush for ast::Variant {
-    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
-        let span = parser.parse::<T![variant]>()?.0;
+impl Parse for ast::Variant {
+    fn parse(parser: &mut Parser) -> Result<Self> {
+        let span = parser.expect::<T![variant]>()?.0;
         let mut head = None;
         let mut current = None;
         loop {
@@ -25,25 +26,25 @@ impl ParsePush for ast::Variant {
             };
         }
 
-        parser.push(Variant {
+        Ok(Variant {
             span,
             variations: head,
         })
     }
 }
 
-impl ParsePush for ast::VariationSlot {
-    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
-        let span = parser.parse::<T![slot]>()?.0;
+impl Parse for ast::VariationSlot {
+    fn parse(parser: &mut Parser) -> Result<Self> {
+        let span = parser.expect::<T![slot]>()?.0;
         let sym = parser.parse_push()?;
-        parser.push(VariationSlot { span, sym })
+        Ok(VariationSlot { span, sym })
     }
 }
 
-impl ParsePush for ast::VariationImmediate {
-    fn parse_push(parser: &mut Parser) -> Result<NodeId<Self>> {
-        let span = parser.parse::<T![imm]>()?.0;
+impl Parse for ast::VariationImmediate {
+    fn parse(parser: &mut Parser) -> Result<Self> {
+        let span = parser.expect::<T![imm]>()?.0;
         let sym = parser.parse_push()?;
-        parser.push(VariationImmediate { span, sym })
+        Ok(VariationImmediate { span, sym })
     }
 }

@@ -13,6 +13,7 @@ use stucco_compiler::{
     infer::{self, TypeError, Types},
     resolve::{Symbols, resolve},
 };
+use token::Spanned as _;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let src = if let Some(arg) = env::args().skip(1).next() {

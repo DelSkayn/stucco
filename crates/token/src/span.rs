@@ -34,6 +34,10 @@ impl Span {
     pub fn byte_range(&self) -> std::ops::Range<usize> {
         self.0.byte_range()
     }
+
+    pub fn source_text(&self) -> Option<String> {
+        self.0.source_text()
+    }
 }
 
 impl From<proc_macro2::Span> for Span {
