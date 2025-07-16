@@ -49,6 +49,7 @@ library!(Library {
     call: Vec<Call>,
     field: Vec<Field>,
     index: Vec<Index>,
+    cast: Vec<Cast>,
 
     break_: Vec<Break>,
     return_: Vec<Return>,

@@ -23,7 +23,7 @@ mod variant;
 
 pub type Result<T> = StdResult<T, error::Error>;
 
-trait Parse: Sized {
+pub trait Parse: Sized {
     fn parse(parser: &mut Parser) -> Result<Self>;
 }
 
@@ -90,6 +90,7 @@ impl<'a, 'b> Parser<'a, 'b> {
     }
 
     pub fn error<T: fmt::Display>(&self, message: T) -> Error {
+        println!("{}", std::backtrace::Backtrace::force_capture());
         return Error {
             span: self.slice.span().into(),
             message: message.to_string(),

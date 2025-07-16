@@ -1,7 +1,11 @@
-stencil add(a: *mut usize, b: usize)
+stencil add(a: usize, b: usize)
     variant
         slot a,
-        const b,
+        imm b,
+    variant
+        slot a,
+        slot b,
 {
-    a.add(b).write(b);
+    become next(a + b);
 }
+

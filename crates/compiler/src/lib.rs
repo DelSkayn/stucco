@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use ast::{Ast, NodeId};
 use infer::TypeError;
 use std::{error, fmt};

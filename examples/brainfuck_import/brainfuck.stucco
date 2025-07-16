@@ -1,80 +1,86 @@
-stencil next(stack: *mut usize, count: usize)
+stencil next(stack: usize, count: usize)
     variant
         imm count,
         slot stack,
 {
-    let stack = stack.add(count);
-    become next(stack);
+    let stack = (stack as *mut usize).add(count);
+    become next(stack as usize);
 }
     
-stencil previous(stack: *mut usize, count: usize)
+stencil previous(stack: usize, count: usize)
     variant
         imm count,
         slot stack,
 {
-    let stack = stack.sub(count);
-    become next(stack);
+    let stack = (stack as *mut usize).sub(count);
+    become next(stack as usize);
 }
 
-stencil increment(stack: *mut usize, by: usize)
+stencil increment(stack: usize, by: usize)
     variant
         imm by,
         slot stack,
 {
+    let stack = (stack as *mut usize)
     stack.write(stack.read() + by);
-    become next(stack)
+    become next(stack as usize)
 }
 
-stencil decrement(stack: *mut usize, by: usize)
+stencil decrement(stack: usize, by: usize)
     variant
         imm by,
         slot stack,
 {
+    let stack = (stack as *mut usize)
     stack.write(stack.read() - by);
-    become next(stack)
+    become next(stack as usize)
 }
 
-stencil put(stack: *mut usize, write: fn(usize))
+stencil put(stack: usize, write: fn(usize))
     variant
         imm write,
         slot stack,
 {
+    let stack = (stack as *mut usize)
     write(stack.read());
-    become next(stack)
+    become next(stack as usize)
 }
 
 
-stencil gets(stack: *mut usize, read: fn() -> usize)
+stencil gets(stack: usize, read: fn() -> usize)
     variant
         imm read,
         slot stack,
 {
+    let stack = (stack as *mut usize)
     stack.write(read());
-    become next(stack)
+    become next(stack as usize)
 }
 
-stencil jump_forward(stack: *mut usize)
+stencil jump_forward(stack: usize)
     variant
         slot stack
 {
+    let stack = (stack as *mut usize)
     if stack.read() == 0 {
-        become forward(stack)
+        become forward(stack as usize)
     }
-    become next(stack)
+    become next(stack as usize)
 }
 
 
-stencil jump_backward(stack: *mut usize)
+stencil jump_backward(stack: usize)
     variant
         slot stack
 {
+    let stack = (stack as *mut usize)
     if stack.read() != 0 {
-        become backward(stack)
+        become backward(stack as usize)
     }
-    become next(stack)
+    become next(stack as usize)
 }
 
-stencil halt(stack: *mut usize)
+stencil halt(stack: usize)
     variant
         slot stack
 {

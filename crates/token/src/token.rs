@@ -114,16 +114,19 @@ impl_keywords! {
     return => Return,
     while => While,
     mod => Mod,
+    as => As,
     imm => Imm,
     slot => Slot,
     stencil => Stencil,
     variant => Variant,
 }
-pub(crate) use T_keyword;
 
 macro_rules! impl_punct{
     ($([$punct:tt]=> $type:ident),*$(,)?) => {
-        $(pub struct $type(pub $crate::Span);
+        $(
+
+        #[derive(Debug)]
+        pub struct $type(pub $crate::Span);
 
         impl $crate::Spanned for $type{
             fn span(&self) -> $crate::Span{
@@ -147,29 +150,36 @@ macro_rules! impl_punct{
                 let check_point = slice.clone();
                 slice.advance();
 
-                let mut span: $crate::Span = punct.span().into();
+                let span: $crate::Span = punct.span().into();
 
                 for i in 1..bytes.len() {
-                    if punct.spacing() != Spacing::Joint {
+                    if let Spacing::Alone = punct.spacing() {
                         slice.restore(check_point);
                         return None;
                     }
-                    let new_punct = slice.punct()?;
+
+
+                    let Some(new_punct) = slice.punct() else{
+                        slice.restore(check_point);
+                        return None
+                    };
+
                     if new_punct.as_char() != bytes[i] as char {
                         slice.restore(check_point);
                         return None;
                     }
+
+                    slice.advance();
                     punct = new_punct;
-                    span = span.try_join(punct.span().into());
                 }
 
-                if punct.spacing() != Spacing::Alone {
+                if let Spacing::Joint = punct.spacing() {
                     slice.restore(check_point);
                     return None;
                 }
 
 
-                Some(Self(span))
+                Some(Self(span.try_join(punct.span().into())))
             }
         }
 
@@ -181,7 +191,7 @@ macro_rules! impl_punct{
 
                 let bytes = Self::NAME.as_bytes();
 
-                let Some(punct) = slice.punct() else {
+                let Some(mut punct) = slice.punct() else {
                     return false
                 };
                 if punct.as_char() != bytes[0] as char {
@@ -189,21 +199,22 @@ macro_rules! impl_punct{
                 }
 
                 let slice = slice.clone();
-                slice.advance();
 
                 for i in 1..bytes.len() {
                     if punct.spacing() != Spacing::Joint {
                         return false;
                     }
-                    let Some(punct) = slice.punct() else {
+                    slice.advance();
+                    let Some(new_punct) = slice.punct() else {
                         return false
                     };
-                    if punct.as_char() != bytes[i] as char {
+                    if new_punct.as_char() != bytes[i] as char {
                         return false;
                     }
+                    punct = new_punct;
                 }
 
-                punct.spacing() != Spacing::Alone
+                punct.spacing() == Spacing::Alone
             }
         })*
 

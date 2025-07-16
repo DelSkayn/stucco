@@ -1,4 +1,4 @@
-use ast::{NodeId, Variant};
+use ast::Variant;
 use token::T;
 
 use crate::{Parse, Parser, Result};

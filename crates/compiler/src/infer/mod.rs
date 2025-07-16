@@ -26,10 +26,11 @@ pub enum TypeError {
     TypeAnnotationRequired(TyId),
     InfiniteType,
     TypeMustBeKnown(NodeId<Method>),
-    UnknownMethod(Ident, TyId),
+    UnknownMethod(NodeId<Ident>, TyId),
     InvalidArity(NodeId<Method>, usize),
     UnknownType(NodeId<ast::Type>),
     LiteralOverflow(NodeId<Lit>, TyId),
+    InvalidCast { from: TyId, to: TyId },
     CantInfer(TyId),
 }
 
@@ -107,8 +108,28 @@ impl Types {
         res
     }
 
-    pub fn find_type_for_expr(&self, n: NodeId<ast::Expr>) -> Option<TyId> {
+    pub fn ty_ast(&self, n: NodeId<ast::Expr>) -> Option<&Ty> {
+        let n = self.find_type_ast(n)?;
+        Some(&self.type_graph[n])
+    }
+
+    pub fn ty_block(&self, n: NodeId<ast::Block>) -> Option<&Ty> {
+        let n = self.find_type_block(n)?;
+        Some(&self.type_graph[n])
+    }
+
+    pub fn find_type_ast(&self, n: NodeId<ast::Expr>) -> Option<TyId> {
         let ty = self.expr_to_type.get(n).copied()??;
+        Some(self.find_type(ty))
+    }
+
+    pub fn find_type_block(&self, n: NodeId<ast::Block>) -> Option<TyId> {
+        let ty = self.block_type.get(n).copied()??;
+        Some(self.find_type(ty))
+    }
+
+    pub fn find_type_symbol(&self, n: SymbolId) -> Option<TyId> {
+        let ty = self.symbol_to_type.get(n).copied()??;
         Some(self.find_type(ty))
     }
 
@@ -152,6 +173,61 @@ impl Types {
                     || self.occurs_in(ty, r)
                     || x.iter().copied().any(|x| x == ty || self.occurs_in(ty, x))
             }
+        }
+    }
+
+    /// Returns if type a and b are the same type,
+    /// will return None if either a or b is not yet resolved.
+    fn same_type(&self, a_id: TyId, b_id: TyId) -> Option<bool> {
+        let a = self.find_type(a_id);
+        let b = self.find_type(b_id);
+
+        match (&self.type_graph[a], &self.type_graph[b]) {
+            (Ty::Var(..), _) | (_, Ty::Var(..)) => None,
+            (Ty::Ptr(a), Ty::Ptr(b))
+            | (Ty::PtrMut(a), Ty::PtrMut(b))
+            | (Ty::Ref(a), Ty::Ref(b))
+            | (Ty::RefMut(a), Ty::RefMut(b)) => {
+                return self.same_type(*a, *b);
+            }
+            (Ty::Array(a, s1), Ty::Array(b, s2)) => {
+                if s1 != s2 {
+                    return Some(false);
+                }
+                return self.same_type(*a, *b);
+            }
+            (Ty::Tuple(tup1), Ty::Tuple(tup2)) => {
+                if tup1.len() != tup2.len() {
+                    return Some(false);
+                }
+                for (a, b) in tup1.iter().copied().zip(tup2.iter().copied()) {
+                    match self.same_type(a, b) {
+                        None => return None,
+                        Some(false) => return Some(false),
+                        Some(true) => {}
+                    }
+                }
+                Some(true)
+            }
+            (Ty::Fn(arg1, r1), Ty::Fn(arg2, r2)) => {
+                if arg1.len() != arg2.len() {
+                    return Some(false);
+                }
+                match self.same_type(*r1, *r2) {
+                    None => return None,
+                    Some(false) => return Some(false),
+                    Some(true) => {}
+                }
+                for (a, b) in arg1.iter().copied().zip(arg2.iter().copied()) {
+                    match self.same_type(a, b) {
+                        None => return None,
+                        Some(false) => return Some(false),
+                        Some(true) => {}
+                    }
+                }
+                Some(true)
+            }
+            _ => Some(false),
         }
     }
 
@@ -247,7 +323,7 @@ impl Types {
     fn validate(&self, ast: &Ast) -> Result<(), TypeError> {
         for (idx, expr) in ast.library().expr.iter().enumerate() {
             let id = NodeId::<ast::Expr>::from_idx(idx).unwrap();
-            let ty = self.find_type_for_expr(id).unwrap();
+            let ty = self.find_type_ast(id).unwrap();
             if matches!(self.type_graph[ty], Ty::Var(..)) {
                 return Err(TypeError::CantInfer(ty));
             }
@@ -512,9 +588,112 @@ pub struct InferUpPass<'a> {
 }
 
 impl<'a> InferUpPass<'a> {
+    fn can_cast(&mut self, from: TyId, to: TyId) -> Result<bool, TypeError> {
+        let from = self.ty.find_type(from);
+        let to = self.ty.find_type(to);
+
+        if matches!(self.ty.type_graph[from], Ty::Var(..)) {
+            return Err(TypeError::TypeAnnotationRequired(from));
+        }
+
+        if matches!(self.ty.type_graph[to], Ty::Var(..)) {
+            return Err(TypeError::TypeAnnotationRequired(from));
+        }
+
+        if self.ty.same_type(from, to).unwrap() {
+            return Ok(true);
+        }
+
+        match self.ty.type_graph[from] {
+            Ty::Prim(prim_ty) => {
+                match prim_ty {
+                    // Nil can only cast to itself and we already found that that we don't cast to
+                    // the same type.
+                    PrimTy::Nil => Ok(false),
+                    PrimTy::Bool => match self.ty.type_graph[to] {
+                        Ty::Prim(prim_ty) => match prim_ty {
+                            PrimTy::Bool
+                            | PrimTy::Usize
+                            | PrimTy::Isize
+                            | PrimTy::U64
+                            | PrimTy::I64
+                            | PrimTy::U32
+                            | PrimTy::I32
+                            | PrimTy::U16
+                            | PrimTy::I16
+                            | PrimTy::U8
+                            | PrimTy::I8
+                            | PrimTy::F32
+                            | PrimTy::F64 => Ok(true),
+                            _ => Ok(false),
+                        },
+                        _ => Ok(false),
+                    },
+                    PrimTy::Usize => match self.ty.type_graph[to] {
+                        Ty::Prim(prim_ty) => match prim_ty {
+                            PrimTy::Usize
+                            | PrimTy::Isize
+                            | PrimTy::U64
+                            | PrimTy::I64
+                            | PrimTy::U32
+                            | PrimTy::I32
+                            | PrimTy::U16
+                            | PrimTy::I16
+                            | PrimTy::U8
+                            | PrimTy::I8
+                            | PrimTy::F32
+                            | PrimTy::F64 => Ok(true),
+                            _ => Ok(false),
+                        },
+                        Ty::Ptr(_) | Ty::PtrMut(_) => Ok(true),
+                        _ => Ok(false),
+                    },
+                    PrimTy::Isize
+                    | PrimTy::U64
+                    | PrimTy::I64
+                    | PrimTy::U32
+                    | PrimTy::I32
+                    | PrimTy::U16
+                    | PrimTy::I16
+                    | PrimTy::U8
+                    | PrimTy::I8
+                    | PrimTy::F32
+                    | PrimTy::F64 => match self.ty.type_graph[to] {
+                        Ty::Prim(prim_ty) => match prim_ty {
+                            PrimTy::Usize
+                            | PrimTy::Isize
+                            | PrimTy::U64
+                            | PrimTy::I64
+                            | PrimTy::U32
+                            | PrimTy::I32
+                            | PrimTy::U16
+                            | PrimTy::I16
+                            | PrimTy::U8
+                            | PrimTy::I8
+                            | PrimTy::F32
+                            | PrimTy::F64 => Ok(true),
+                            _ => Ok(false),
+                        },
+                        _ => Ok(false),
+                    },
+                    PrimTy::Diverges => todo!(),
+                }
+            }
+            Ty::Ptr(_) | Ty::PtrMut(_) => match self.ty.type_graph[to] {
+                Ty::Prim(prim_ty) => match prim_ty {
+                    PrimTy::Usize => Ok(true),
+                    _ => Ok(false),
+                },
+                Ty::Ptr(_) | Ty::PtrMut(_) => Ok(true),
+                _ => Ok(false),
+            },
+            _ => Ok(false),
+        }
+    }
+
     fn type_from_ast(&mut self, ast: &ast::Ast, ty: NodeId<ast::Type>) -> Result<TyId, TypeError> {
         match ast[ty] {
-            ast::Type::Array(node_id) => todo!(),
+            ast::Type::Array(_) => todo!(),
             ast::Type::Fn(n) => {
                 let args = ast
                     .iter_list_node(ast[n].params)
@@ -527,7 +706,7 @@ impl<'a> InferUpPass<'a> {
                     .unwrap_or(Types::NIL_ID);
                 return Ok(self.ty.type_graph.push(Ty::Fn(args, output)).unwrap());
             }
-            ast::Type::Tuple(node_id) => todo!(),
+            ast::Type::Tuple(_) => todo!(),
             ast::Type::Ptr(node_id) => {
                 let inner = self.type_from_ast(ast, ast[node_id].ty)?;
                 if ast[node_id].mutable {
@@ -536,7 +715,7 @@ impl<'a> InferUpPass<'a> {
                     return Ok(self.ty.type_graph.push(Ty::Ptr(inner)).unwrap());
                 }
             }
-            ast::Type::Reference(node_id) => todo!(),
+            ast::Type::Reference(_) => todo!(),
             ast::Type::Direct(node_id) => {
                 let ident = &ast[node_id];
                 if ident == "f32" {
@@ -630,7 +809,10 @@ impl<'a> InferUpPass<'a> {
             Ty::Array(_, _) => todo!(),
             Ty::Var(_, _) => return Err(TypeError::TypeMustBeKnown(method)),
         }
-        return Err(TypeError::UnknownMethod(name.clone(), receiver_type));
+        return Err(TypeError::UnknownMethod(
+            method.index(ast).name,
+            receiver_type,
+        ));
     }
 }
 
@@ -767,7 +949,15 @@ impl<'a> Visit for InferUpPass<'a> {
                     .expr_to_type
                     .insert_fill_default(e, Some(self.ty.block_type[node_id].unwrap()));
             }
-            ast::Expr::Cast(node_id) => todo!(),
+            ast::Expr::Cast(c) => {
+                self.visit_expr(ast, ast[c].expr)?;
+                let from = self.ty.expr_to_type[ast[c].expr].unwrap();
+                let to = self.type_from_ast(ast, ast[c].ty)?;
+                if !self.can_cast(from, to)? {
+                    return Err(TypeError::InvalidCast { from, to });
+                }
+                self.ty.expr_to_type.insert_fill_default(e, Some(to));
+            }
             ast::Expr::Loop(n) => {
                 let block = ast[n].body;
                 let ty_id = self.ty.new_type_var(Narrowing::None);
@@ -824,7 +1014,7 @@ impl<'a> Visit for InferUpPass<'a> {
                     .insert_fill_default(e, Some(Types::DIVERGES_ID));
             }
             ast::Expr::Return(n) => {
-                if let Some(n) = ast[n].expr {
+                if let Some(_) = ast[n].expr {
                     todo!()
                 }
                 self.ty
@@ -855,8 +1045,8 @@ impl<'a> Visit for InferUpPass<'a> {
                 let ty = self.resolve_method(ast, n, recv_type)?;
                 self.ty.expr_to_type.insert_fill_default(e, Some(ty))
             }
-            ast::Expr::Field(node_id) => todo!(),
-            ast::Expr::Index(node_id) => todo!(),
+            ast::Expr::Field(_) => todo!(),
+            ast::Expr::Index(_) => todo!(),
             ast::Expr::Literal(node_id) => {
                 match ast[node_id] {
                     Lit::Int(ref lit_int) => match lit_int.suffix() {

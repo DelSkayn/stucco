@@ -10,7 +10,7 @@ use core::fmt;
 use parser::{Parser, parse_external_module};
 use std::{env, error::Error, fmt::Write as _, io::Read};
 use stucco_compiler::{
-    infer::{self, TypeError, Types},
+    infer::{TypeError, Types},
     resolve::{Symbols, resolve},
 };
 use token::Spanned as _;
@@ -64,6 +64,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                         ast[lit].span().source_text(),
                         types.type_to_string(ty)
                     )
+                }
+                TypeError::UnknownMethod(lit, ty) => {
+                    eprintln!(
+                        "unknown method '{:?}' for type {}",
+                        ast[lit].span().source_text(),
+                        types.type_to_string(ty)
+                    )
+                }
+                TypeError::UnknownType(ty) => {
+                    eprintln!("unknown type '{:?}'", ast[ty].ast_span(&ast).source_text(),)
                 }
                 _ => {}
             }
@@ -159,5 +169,23 @@ where
         }
 
         self.indent(|this| visit::visit_expr(this, ast, e))
+    }
+
+    fn visit_symbol(
+        &mut self,
+        ast: &ast::Ast,
+        e: ast::NodeId<ast::Symbol>,
+    ) -> Result<(), Self::Error> {
+        let byte_range = e.ast_span(ast).byte_range();
+        let line = error::render_line(self.source, byte_range);
+        write!(self.fmt, "'{}'", line.trim())?;
+        let symbol = self.symbols.ast_to_symbol[e].unwrap();
+        if let Some(x) = self.types.symbol_to_type.get(symbol).copied().flatten() {
+            let ty = self.types.find_type(x);
+            writeln!(self.fmt, " = {:?}", &self.types.type_to_string(ty))?;
+        } else {
+            writeln!(self.fmt, " = NOT INFERED")?;
+        }
+        Ok(())
     }
 }

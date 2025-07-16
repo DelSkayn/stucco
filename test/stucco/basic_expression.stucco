@@ -1,7 +1,7 @@
-    stencil add(amount: usize)
-        variant
-            slot amount
-    {
-        let t = 8 + amount;
-        become next(t)
-    }
+stencil add(amount: usize)
+    variant
+        imm amount
+{
+    let t = 8 + amount;
+    become next(t)
+}

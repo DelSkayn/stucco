@@ -23,11 +23,11 @@ pub enum BindingPower {
     Shift,
     AddSub,
     MulDiv,
-    Cast,
+    //Cast,
     Unary,
     CallIndex,
-    Field,
-    Method,
+    //Field,
+    //Method,
 }
 
 macro_rules! parse_bin_op {
@@ -75,11 +75,20 @@ fn parse_binding(parser: &mut Parser, bp: BindingPower) -> Result<ast::Expr> {
             lhs = parse_call(parser, lhs)?;
             continue;
         }
+
         if parser.peek::<T![.]>() {
             if BindingPower::CallIndex < bp {
                 break;
             }
             lhs = parse_dot(parser, lhs)?;
+            continue;
+        }
+
+        if parser.peek::<T![as]>() {
+            if BindingPower::CallIndex < bp {
+                break;
+            }
+            lhs = parse_cast(parser, lhs)?;
             continue;
         }
 
@@ -150,7 +159,7 @@ fn parse_unary(parser: &mut Parser) -> Result<ast::Expr> {
         (t.0, UnOp::Not)
     } else if let Some(t) = parser.eat::<T![*]>() {
         (t.0, UnOp::Star)
-    } else if let Some(t) = parser.eat::<T![*]>() {
+    } else if let Some(t) = parser.eat::<T![-]>() {
         (t.0, UnOp::Minus)
     } else {
         return parse_prime(parser);
@@ -204,4 +213,13 @@ fn parse_dot(parser: &mut Parser, base: ast::Expr) -> Result<ast::Expr> {
         })?;
         Ok(ast::Expr::Field(field))
     }
+}
+
+fn parse_cast(parser: &mut Parser, base: ast::Expr) -> Result<ast::Expr> {
+    let expr = parser.push(base)?;
+    let span = parser.expect::<T![as]>()?.0;
+    let ty = parser.parse_push()?;
+    let c = parser.push(ast::Cast { expr, ty, span })?;
+
+    Ok(ast::Expr::Cast(c))
 }

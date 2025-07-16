@@ -220,5 +220,5 @@ fn slice_chars(line: &str, range: Range<usize>) -> &str {
 }
 
 unsafe fn str_offset_from(a: &str, b: &str) -> isize {
-    a.as_ptr().offset_from(b.as_ptr())
+    unsafe { a.as_ptr().offset_from(b.as_ptr()) }
 }

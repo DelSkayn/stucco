@@ -1,9 +1,10 @@
-[package]
-name = "stucco"
-version = "0.1.0"
-edition = "2024"
+#[package]
+#name = "stucco"
+#version = "0.1.0"
+#edition = "2024"
 
 [workspace]
+resolver = "3"
 members = ["crates/*"]
 
 [workspace.dependencies]
@@ -18,9 +19,9 @@ token = { path = "./crates/token", package = "stucco_token" }
 proc-macro2 = "1.0.86"
 hashbrown = {version = "0.14.5"}
 
-[dependencies]
-memmap2 = "0.9.4"
-object = { version = "0.36.2", features = ["write"] }
-parser = { workspace = true }
-derive = { workspace = true }
+#[dependencies]
+#memmap2 = "0.9.4"
+#object = { version = "0.36.2", features = ["write"] }
+#parser = { workspace = true }
+#derive = { workspace = true }
 

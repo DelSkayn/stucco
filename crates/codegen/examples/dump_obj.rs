@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let code_gen = CodeGen::new(&ast, &symbols, &types, Default::default());
+    let code_gen = CodeGen::new(ast, symbols, types, Default::default());
 
     let path = format!("{arg}_obj");
     let path = Path::new(&path);
@@ -58,23 +58,42 @@ fn main() -> Result<(), Box<dyn Error>> {
         std::fs::create_dir(path)?;
     }
 
-    for stencil in ast.iter_list_node(ast[node].stencils) {
-        for var in ast.iter_list_node(ast[stencil].variants) {
+    for stencil in code_gen.ast.iter_list_node(code_gen.ast[node].stencils) {
+        for var in code_gen.ast.iter_list_node(code_gen.ast[stencil].variants) {
             let obj = code_gen
-                .generate_variation(stencil, var)
+                .generate_variant(stencil, var)
                 .into_object(Target::X86_64);
 
-            let mut name = ast[stencil].sym.index(&ast).name.index(&ast).to_string();
-            for v in ast.iter_list(ast[var].variations) {
+            let mut name = code_gen.ast[stencil]
+                .sym
+                .index(&code_gen.ast)
+                .name
+                .index(&code_gen.ast)
+                .to_string();
+            for v in code_gen.ast.iter_list(code_gen.ast[var].variations) {
                 match v {
                     ast::Variation::Immediate(n) => {
                         name.push_str("_");
-                        name.push_str(&ast[*n].sym.index(&ast).name.index(&ast).to_string());
+                        name.push_str(
+                            &code_gen.ast[*n]
+                                .sym
+                                .index(&code_gen.ast)
+                                .name
+                                .index(&code_gen.ast)
+                                .to_string(),
+                        );
                         name.push_str("_imm");
                     }
                     ast::Variation::Slot(n) => {
                         name.push_str("_");
-                        name.push_str(&ast[*n].sym.index(&ast).name.index(&ast).to_string());
+                        name.push_str(
+                            &code_gen.ast[*n]
+                                .sym
+                                .index(&code_gen.ast)
+                                .name
+                                .index(&code_gen.ast)
+                                .to_string(),
+                        );
                         name.push_str("_slot");
                     }
                 }

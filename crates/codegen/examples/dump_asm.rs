@@ -49,12 +49,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let code_gen = CodeGen::new(&ast, &symbols, &types, Default::default());
+    let code_gen = CodeGen::new(ast, symbols, types, Default::default());
 
-    for stencil in ast.iter_list_node(ast[node].stencils) {
-        for var in ast.iter_list_node(ast[stencil].variants) {
+    for stencil in code_gen.ast.iter_list_node(code_gen.ast[node].stencils) {
+        for var in code_gen.ast.iter_list_node(code_gen.ast[stencil].variants) {
+            println!(
+                "=== {} ===",
+                code_gen.ast[stencil]
+                    .sym
+                    .index(&code_gen.ast)
+                    .name
+                    .index(&code_gen.ast)
+            );
+
             let assembly = code_gen
-                .generate_variation(stencil, var)
+                .generate_variant(stencil, var)
                 .into_assembly(Target::X86_64);
             println!("{assembly}")
         }

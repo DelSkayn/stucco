@@ -49,13 +49,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let code_gen = CodeGen::new(&ast, &symbols, &types, Default::default());
+    let code_gen = CodeGen::new(ast, symbols, types, Default::default());
 
-    for stencil in ast.iter_list_node(ast[node].stencils) {
-        for var in ast.iter_list_node(ast[stencil].variants) {
-            let module = code_gen.generate_variation(stencil, var).into_module();
-            let str = module.print_to_string().to_string_lossy().into_owned();
-            println!("{str}")
+    for stencil in code_gen.ast.iter_list_node(code_gen.ast[node].stencils) {
+        for var in code_gen.ast.iter_list_node(code_gen.ast[stencil].variants) {
+            println!(
+                "=== {} ===",
+                code_gen.ast[stencil]
+                    .sym
+                    .index(&code_gen.ast)
+                    .name
+                    .index(&code_gen.ast)
+            );
+
+            let ir = code_gen
+                .generate_variant(stencil, var)
+                .into_module()
+                .print_to_string()
+                .to_string_lossy()
+                .into_owned();
+            println!("{ir}")
         }
     }
 
