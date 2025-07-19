@@ -1,7 +1,4 @@
-use compiler::infer::TyId;
 use inkwell::types::{AnyTypeEnum, BasicType, BasicTypeEnum, FunctionType, VoidType};
-
-use crate::ir::VariantGen;
 
 pub enum NonBasicTypeEnum<'ctx> {
     VoidType(VoidType<'ctx>),

@@ -15,9 +15,12 @@ parser = { path = "./crates/parser", package = "stucco_parser"}
 derive = { path = "./crates/derive", package = "stucco_derive"}
 runner = { path = "./crates/runner", package = "stucco_runner"}
 token = { path = "./crates/token", package = "stucco_token" }
+codegen = { path = "./crates/codegen", package = "stucco_codegen", default-features = false }
 
 proc-macro2 = "1.0.86"
 hashbrown = {version = "0.14.5"}
+inkwell = { version = "0.6.0" }
+llvm-sys = { version = "181.2" }
 
 #[dependencies]
 #memmap2 = "0.9.4"

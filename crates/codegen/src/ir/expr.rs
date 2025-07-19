@@ -2,8 +2,11 @@ use super::VariantGen;
 use crate::{NumberType, value::Value};
 use ast::NodeId;
 use compiler::infer::{PrimTy, Ty};
-use inkwell::{IntPredicate, values::InstructionOpcode};
-use llvm_sys::{LLVMCallConv, LLVMTailCallKind};
+use inkwell::{
+    IntPredicate,
+    llvm_sys::{LLVMCallConv, LLVMTailCallKind},
+    values::InstructionOpcode,
+};
 use token::token::{IntType, Lit};
 
 impl<'ctx> VariantGen<'ctx> {
@@ -177,7 +180,7 @@ impl<'ctx> VariantGen<'ctx> {
         let ty = self.function.get_type();
         let func = self.module.add_function(
             &format!(
-                "__become_{}__",
+                "__become_{}",
                 b.index(&self.ctx.ast).callee.index(&self.ctx.ast)
             ),
             ty,

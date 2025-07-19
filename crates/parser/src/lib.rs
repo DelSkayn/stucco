@@ -1,5 +1,4 @@
 use ast::{Ast, AstSpanned, Node, NodeId, NodeListId};
-use error::Error;
 use proc_macro2::TokenStream;
 use std::{
     fmt,
@@ -20,6 +19,8 @@ mod stencil;
 mod test;
 mod ty;
 mod variant;
+
+pub use error::Error;
 
 pub type Result<T> = StdResult<T, error::Error>;
 

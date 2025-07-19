@@ -262,6 +262,7 @@ impl_punct! {
     [-] => Minus,
     [-=] => MinusEq,
     [->] => RArrow,
+    [=>] => RFatArrow,
     [>] => RChevron,
     [>=] => RChevronEq,
     [>>] => RChevronRChevron,

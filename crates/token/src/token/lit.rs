@@ -5,8 +5,8 @@ use proc_macro2::Literal;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LitStr {
-    value: String,
-    span: Span,
+    pub value: String,
+    pub span: Span,
 }
 impl Spanned for LitStr {
     fn span(&self) -> crate::Span {
@@ -198,6 +198,11 @@ pub fn parse_literal(lit: Literal) -> Result<Lit, TokenError> {
                 }));
             }
         }
+        b'"' => {
+            if let Some(l) = parse_lit_str(&lit, repr) {
+                return Ok(Lit::Str(l));
+            }
+        }
         _ => {}
     }
 
@@ -285,4 +290,86 @@ fn parse_lit_int(lit: &Literal, source: String) -> Option<LitInt> {
         suffix,
         span: lit.span().into(),
     })
+}
+
+type CharPeek<'a> = std::iter::Peekable<std::str::Chars<'a>>;
+fn parse_lit_str(lit: &Literal, string: String) -> Option<LitStr> {
+    let mut res = String::with_capacity(string.len());
+    let mut iter = string.chars().peekable();
+
+    assert_eq!(iter.next(), Some('"'));
+
+    loop {
+        let Some(next) = iter.next() else { return None };
+        match next {
+            '\\' => {
+                if !parse_escape(&mut iter, &mut res) {
+                    return None;
+                }
+            }
+            '"' => break,
+            x => res.push(x),
+        }
+    }
+
+    res.shrink_to_fit();
+
+    Some(LitStr {
+        value: res,
+        span: lit.span().into(),
+    })
+}
+
+fn parse_escape(peek: &mut CharPeek, buffer: &mut String) -> bool {
+    let Some(next) = peek.next() else {
+        return false;
+    };
+    match next {
+        'n' => buffer.push('\n'),
+        'r' => buffer.push('\r'),
+        't' => buffer.push('\t'),
+        '\\' => buffer.push('\\'),
+        '0' => buffer.push('\0'),
+        '"' => buffer.push('"'),
+        '\'' => buffer.push('\''),
+        'x' => {
+            let Some(a) = peek.next() else { return false };
+            let Some(a) = a.to_digit(8) else {
+                return false;
+            };
+            let Some(b) = peek.next() else { return false };
+            let Some(b) = b.to_digit(16) else {
+                return false;
+            };
+            let res = a * 16 + b;
+            buffer.push(res as u8 as char);
+        }
+        'u' => {
+            let Some('{') = peek.next() else { return false };
+            let mut c = 0;
+            for _ in 0..6 {
+                let Some(x) = peek.peek().copied() else {
+                    return false;
+                };
+                if x == '}' {
+                    break;
+                }
+                let Some(x) = x.to_digit(16) else {
+                    return false;
+                };
+                c *= 16;
+                c += x;
+                peek.next();
+            }
+            let Some('}') = peek.next() else { return false };
+            let Some(c) = char::from_u32(c) else {
+                return false;
+            };
+            buffer.push(c);
+        }
+
+        _ => return false,
+    }
+
+    true
 }

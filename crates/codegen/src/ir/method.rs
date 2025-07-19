@@ -1,9 +1,8 @@
 use crate::value::Value;
 use ast::{self, NodeId};
 use compiler::infer::{Ty, TyId, Types};
-use inkwell::values::BasicValueEnum;
 use llvm_sys::LLVMCallConv;
-use std::{cell::OnceCell, collections::HashMap, sync::OnceLock};
+use std::{collections::HashMap, sync::OnceLock};
 
 use super::VariantGen;
 

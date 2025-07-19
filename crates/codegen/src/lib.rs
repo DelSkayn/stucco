@@ -1,29 +1,15 @@
 #![allow(dead_code)]
 
-use std::{collections::HashMap, fmt::Write as _};
+use std::collections::HashMap;
 
 use ast::{Ast, NodeId};
 use compiler::{
-    infer::{PrimTy, Ty, TyId, Types},
-    resolve::{SymbolId, Symbols},
+    infer::{PrimTy, Ty, Types},
+    resolve::Symbols,
 };
-use inkwell::{
-    AddressSpace,
-    attributes::Attribute,
-    builder::Builder,
-    context::Context,
-    llvm_sys::LLVMCallConv,
-    module::{Linkage, Module},
-    targets::{FileType, Target as LLVMTarget, TargetMachine, TargetTriple},
-    types::{AnyType, AnyTypeEnum, BasicMetadataTypeEnum, BasicType},
-    values::{AnyValue, LLVMTailCallKind},
-};
+use inkwell::context::Context;
 use ir::{VariantGen, VariantModule};
 pub use target::Target;
-use token::token::{IntType, Lit};
-use util::{NonBasicTypeEnum, try_any_to_basic};
-use value::Value;
-use wrapper::GlobalValueExt;
 
 mod ir;
 mod obj;
@@ -31,6 +17,7 @@ mod target;
 pub mod util;
 mod value;
 mod wrapper;
+pub use obj::{Immediate, Jump, Stencil, StencilSet, StencilVariant};
 
 #[cfg(not(any(feature = "stand-alone", feature = "proc-macro")))]
 compile_error!(
@@ -93,6 +80,40 @@ impl CodeGen {
             types,
             config,
         }
+    }
+
+    pub fn generate_stencil_set(
+        &self,
+        root: NodeId<ast::Module>,
+        target: Target,
+    ) -> obj::StencilSet {
+        let mut set = obj::StencilSet {
+            stencils: HashMap::new(),
+        };
+        for s in self.ast.iter_list_node(self.ast[root].stencils) {
+            let mut stencil = obj::Stencil {
+                variants: Vec::new(),
+            };
+            for v in self.ast.iter_list_node(self.ast[s].variants) {
+                let module = self.generate_variant(s, v);
+                let object = module.into_object(target);
+                let Ok(variant) = obj::extract_stencil_variant(&object) else {
+                    panic!()
+                };
+                stencil.variants.push(variant);
+            }
+            set.stencils.insert(
+                self.ast[s]
+                    .sym
+                    .index(&self.ast)
+                    .name
+                    .index(&self.ast)
+                    .to_string(),
+                stencil,
+            );
+        }
+
+        set
     }
 
     pub fn generate_variant<'ctx>(

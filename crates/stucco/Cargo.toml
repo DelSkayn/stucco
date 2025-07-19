@@ -1,0 +1,11 @@
+[package]
+name = "stucco"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+memmap2 = "0.9.4"
+object = { version = "0.36.2", features = ["write"] }
+parser = { workspace = true }
+derive = { workspace = true }
+

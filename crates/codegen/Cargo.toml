@@ -16,8 +16,8 @@ compiler.workspace = true
 token.workspace = true
 
 # LLVM bindings
-inkwell = { version = "0.6.0", features = ["llvm18-1"] }
-llvm-sys = { version = "*" }
+inkwell = { workspace = true, features = ["llvm18-1"] }
+llvm-sys.workspace = true
 # Object file parsing
 object = "0.36.2"
 
