@@ -11,5 +11,4 @@ default = ["print"]
 [dependencies]
 common = { workspace = true }
 token = { workspace = true }
-#syn = { workspace = true, features = ["parsing","printing"] }
 proc-macro2 = { workspace = true }

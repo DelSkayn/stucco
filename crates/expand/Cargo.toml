@@ -1,0 +1,27 @@
+
+
+[package]
+name = "stucco_expand"
+version = "0.1.0"
+edition = "2024"
+
+
+[features]
+#default = ["stand-alone"]
+stand-alone = ["codegen/stand-alone"]
+proc-macro = ["codegen/proc-macro"]
+
+[dependencies]
+proc-macro2.workspace = true
+quote.workspace = true
+parser.workspace = true
+ast.workspace = true
+compiler.workspace = true
+token.workspace = true
+codegen = { workspace = true }
+anyhow.workspace = true
+
+[[bin]]
+name = "stucco_cli"
+required-features = ["stand-alone"]
+path = "src/main.rs"

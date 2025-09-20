@@ -58,6 +58,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         std::fs::create_dir(path)?;
     }
 
+    let obj = code_gen.generate_entry().into_object(Target::X86_64);
+    std::fs::write(path.join(format!("__entry__.o")), &obj)?;
+
     for stencil in code_gen.ast.iter_list_node(code_gen.ast[node].stencils) {
         for var in code_gen.ast.iter_list_node(code_gen.ast[stencil].variants) {
             let obj = code_gen

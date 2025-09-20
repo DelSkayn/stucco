@@ -86,6 +86,10 @@ impl Error {
             }),
         ])
     }
+
+    pub fn render(self, source: &str) -> String {
+        imp::render(source, self)
+    }
 }
 
 #[cfg(not(feature = "span-locations"))]

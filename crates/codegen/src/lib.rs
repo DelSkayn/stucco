@@ -23,6 +23,8 @@ pub use obj::{Immediate, Jump, Stencil, StencilSet, StencilVariant};
 compile_error!(
     "Missing feature on stucco_codegen, either feature stand-alone or feature proc-macro must be enabled"
 );
+#[cfg(all(feature = "stand-alone", feature = "proc-macro"))]
+compile_error!("Can't have both feature stand-alone and proc-macro enabled at the same time");
 
 pub struct Config {
     pub num_passing_register: usize,
@@ -87,7 +89,13 @@ impl CodeGen {
         root: NodeId<ast::Module>,
         target: Target,
     ) -> obj::StencilSet {
+        let entry = self.generate_entry();
+        let object = entry.into_object(target);
+        let entry = obj::extract_entry_stencil(&object);
+
         let mut set = obj::StencilSet {
+            passing_registers: self.config.num_passing_register,
+            entry,
             stencils: HashMap::new(),
         };
         for s in self.ast.iter_list_node(self.ast[root].stencils) {
@@ -97,9 +105,7 @@ impl CodeGen {
             for v in self.ast.iter_list_node(self.ast[s].variants) {
                 let module = self.generate_variant(s, v);
                 let object = module.into_object(target);
-                let Ok(variant) = obj::extract_stencil_variant(&object) else {
-                    panic!()
-                };
+                let variant = obj::extract_stencil_variant(&object);
                 stencil.variants.push(variant);
             }
             set.stencils.insert(
@@ -122,5 +128,9 @@ impl CodeGen {
         variant: NodeId<ast::Variant>,
     ) -> VariantModule<'ctx> {
         VariantGen::build(&self, stencil, variant)
+    }
+
+    pub fn generate_entry<'ctx>(&'ctx self) -> VariantModule<'ctx> {
+        VariantGen::generate_entry(self)
     }
 }

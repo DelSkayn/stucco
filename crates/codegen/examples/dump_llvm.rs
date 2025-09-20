@@ -51,6 +51,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let code_gen = CodeGen::new(ast, symbols, types, Default::default());
 
+    let entry = code_gen
+        .generate_entry()
+        .into_module()
+        .print_to_string()
+        .to_string_lossy()
+        .into_owned();
+    println!("=== ENTRY ===");
+    println!("{entry}");
+
     for stencil in code_gen.ast.iter_list_node(code_gen.ast[node].stencils) {
         for var in code_gen.ast.iter_list_node(code_gen.ast[stencil].variants) {
             println!(

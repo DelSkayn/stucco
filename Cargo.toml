@@ -1,30 +1,27 @@
-#[package]
-#name = "stucco"
-#version = "0.1.0"
-#edition = "2024"
-
 [workspace]
 resolver = "3"
-members = ["crates/*"]
+members = [
+    "crates/ast",
+    "crates/codegen",
+    "crates/compiler",
+    "crates/parser",
+    "crates/expand",
+]
 
 [workspace.dependencies]
 ast = { path = "./crates/ast", package = "stucco_ast"}
 common = { path = "./crates/common", package = "stucco_common"}
 compiler = { path = "./crates/compiler", package = "stucco_compiler"}
 parser = { path = "./crates/parser", package = "stucco_parser"}
-derive = { path = "./crates/derive", package = "stucco_derive"}
-runner = { path = "./crates/runner", package = "stucco_runner"}
+#derive = { path = "./crates/derive", package = "stucco_derive"}
+expand = { path = "./crates/expand", package = "stucco_expand" }
 token = { path = "./crates/token", package = "stucco_token" }
-codegen = { path = "./crates/codegen", package = "stucco_codegen", default-features = false }
+codegen = { path = "./crates/codegen", package = "stucco_codegen" }
 
+anyhow = "1"
+quote = "1.0.36"
 proc-macro2 = "1.0.86"
 hashbrown = {version = "0.14.5"}
 inkwell = { version = "0.6.0" }
 llvm-sys = { version = "181.2" }
-
-#[dependencies]
-#memmap2 = "0.9.4"
-#object = { version = "0.36.2", features = ["write"] }
-#parser = { workspace = true }
-#derive = { workspace = true }
 

@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = ["stand-alone"]
-stand-alone = ["inkwell/llvm18-1"]
-proc-macro = ["inkwell/llvm18-1-no-llvm-linking"]
+#default = ["stand-alone"]
+stand-alone = ["inkwell/llvm18-1-force-dynamic", "llvm-sys/force-dynamic"]
+proc-macro = ["inkwell/llvm18-1-no-llvm-linking", "llvm-sys/no-llvm-linking"]
 
 [dependencies]
 # Workspace dependencies
@@ -16,7 +16,7 @@ compiler.workspace = true
 token.workspace = true
 
 # LLVM bindings
-inkwell = { workspace = true, features = ["llvm18-1"] }
+inkwell = { workspace = true }
 llvm-sys.workspace = true
 # Object file parsing
 object = "0.36.2"
@@ -27,3 +27,8 @@ parser = { workspace = true }
 
 [build-dependencies]
 cc = "1.2.25"
+
+[[example]]
+name = "dump_asm"
+path = "examples/dump_asm.rs"
+required-features = ["stand-alone"]

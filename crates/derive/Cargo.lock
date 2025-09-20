@@ -242,7 +242,6 @@ dependencies = [
  "stucco_ast",
  "stucco_common",
  "stucco_compiler",
- "stucco_parser",
  "stucco_token",
 ]
 
@@ -260,8 +259,15 @@ dependencies = [
  "bitflags",
  "stucco_ast",
  "stucco_common",
- "stucco_parser",
  "stucco_token",
+]
+
+[[package]]
+name = "stucco_derive"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "stucco_expand",
 ]
 
 [[package]]

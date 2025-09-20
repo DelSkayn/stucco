@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, btree_map::Entry};
 
 use object::{
     LittleEndian, Object as _, ObjectSection as _, ObjectSymbol as _, RelocationTarget,
@@ -7,6 +7,8 @@ use object::{
 
 #[derive(Debug)]
 pub struct StencilSet {
+    pub passing_registers: usize,
+    pub entry: EntryStencil,
     /// Stencil mapped by the name of the stencil.
     pub stencils: HashMap<String, Stencil>,
 }
@@ -37,14 +39,67 @@ pub struct Jump {
     pub is_fallthrough: bool,
 }
 
-pub enum ObjErrors {
-    InvalidObj(object::read::Error),
+#[derive(Debug)]
+pub struct EntryStencil {
+    pub text: Vec<u8>,
+    pub jump: Jump,
+}
+
+pub fn extract_entry_stencil(object_file_bytes: &[u8]) -> EntryStencil {
+    let Ok(object) = ElfFile64::<LittleEndian>::parse(&object_file_bytes) else {
+        panic!("llvm produced invalid object bytes");
+    };
+
+    let text_section = object.section_by_name_bytes(b".text").unwrap();
+
+    let entry_symbol = object
+        .symbols()
+        .find(|s| s.name_bytes().ok() == Some(b"__main__"))
+        .unwrap();
+
+    let text = text_section
+        .data_range(entry_symbol.address(), entry_symbol.size())
+        .unwrap()
+        .unwrap()
+        .to_vec();
+
+    let mut jump = None;
+
+    for (offset, reloc) in text_section.relocations() {
+        let RelocationTarget::Symbol(tgt) = reloc.target() else {
+            continue;
+        };
+
+        let sym = object.symbol_by_index(tgt).unwrap();
+        let name = sym.name().unwrap();
+
+        if name == "__become_next" {
+            assert!(jump.is_none());
+
+            let size = (reloc.size() / 8) as u32;
+            let is_fallthrough = (offset as u32 + size) == text.len() as u32
+                // jmp instruction
+                 && text[offset as usize - 1] == 233;
+            jump = Some(Jump {
+                size,
+                offset: offset as u32,
+                addend: reloc.addend() as i64,
+                is_fallthrough,
+            });
+        }
+    }
+
+    EntryStencil {
+        text,
+        jump: jump.expect("no continuation jump in entry stencil"),
+    }
 }
 
 /// Extract a stencil from a compiled object file.
-pub fn extract_stencil_variant(object_file_bytes: &[u8]) -> Result<StencilVariant, ObjErrors> {
-    let object =
-        ElfFile64::<LittleEndian>::parse(&object_file_bytes).map_err(ObjErrors::InvalidObj)?;
+pub fn extract_stencil_variant(object_file_bytes: &[u8]) -> StencilVariant {
+    let Ok(object) = ElfFile64::<LittleEndian>::parse(&object_file_bytes) else {
+        panic!("llvm produced invalid object bytes");
+    };
 
     let text_section = object.section_by_name_bytes(b".text").unwrap();
 
@@ -94,9 +149,9 @@ pub fn extract_stencil_variant(object_file_bytes: &[u8]) -> Result<StencilVarian
         }
     }
 
-    Ok(StencilVariant {
+    StencilVariant {
         bytes: text,
         jumps,
         immediates,
-    })
+    }
 }

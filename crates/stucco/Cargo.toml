@@ -1,11 +1,17 @@
+[workspace]
+
 [package]
 name = "stucco"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["object"]
+derive = ["dep:derive"]
+object = ["dep:object"]
+
 [dependencies]
-memmap2 = "0.9.4"
-object = { version = "0.36.2", features = ["write"] }
-parser = { workspace = true }
-derive = { workspace = true }
+derive = { path = "../derive", package = "stucco_derive", optional = true }
+object = { version = "0.37.3", optional = true, features = ["write"] }
+rustix = { version = "1.1.2", features = ["mm"] }
 

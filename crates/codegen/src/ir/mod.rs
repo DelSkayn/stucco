@@ -13,7 +13,7 @@ use inkwell::{
     types::{AnyType as _, BasicType as _},
     values::{AnyValue, FunctionValue},
 };
-use llvm_sys::LLVMCallConv;
+use llvm_sys::{LLVMCallConv, LLVMTailCallKind};
 
 use crate::{CodeGen, Target, value::Value, wrapper::GlobalValueExt as _};
 
@@ -110,6 +110,38 @@ pub struct VariantGen<'ctx> {
 }
 
 impl<'ctx> VariantGen<'ctx> {
+    pub fn generate_entry(ctx: &'ctx CodeGen) -> VariantModule<'ctx> {
+        let module = ctx.context.create_module("entry");
+        let builder = ctx.context.create_builder();
+
+        // Generate signature type.
+        // It is always the same of all stencils.
+        let parameters = (0..ctx.config.num_passing_register)
+            .map(|_| ctx.context.i64_type().as_basic_type_enum().into())
+            .collect::<Vec<_>>();
+
+        let signature = ctx.context.void_type().fn_type(&parameters, false);
+
+        let func = module.add_function("__main__", signature, None);
+        func.set_call_conventions(LLVMCallConv::LLVMCCallConv as u32);
+        let bb = ctx.context.append_basic_block(func, "entry");
+        builder.position_at_end(bb);
+
+        let become_func = module.add_function(&"__become_next", signature, None);
+        become_func.set_call_conventions(LLVMCallConv::LLVMGHCCallConv as u32);
+
+        let params = func.get_param_iter().map(|x| x.into()).collect::<Vec<_>>();
+
+        let become_call = builder
+            .build_call(become_func, &params, "call_next")
+            .unwrap();
+        become_call.set_call_convention(LLVMCallConv::LLVMGHCCallConv as u32);
+        //become_call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindTail);
+        builder.build_return(None).unwrap();
+
+        VariantModule { module, builder }
+    }
+
     pub fn build(
         ctx: &'ctx CodeGen,
         stencil: NodeId<Stencil>,

@@ -1,3 +1,5 @@
+[workspace]
+
 [package]
 name = "stucco_derive"
 version = "0.1.0"
@@ -8,4 +10,4 @@ proc-macro = true
 
 [dependencies]
 proc-macro2 = "1.0.86"
-runner.workspace = true
+expand = { package = "stucco_expand", path = "../expand", features = ["proc-macro"] }

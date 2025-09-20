@@ -1,86 +1,92 @@
 stucco::module!(mod brainfuck {
-    stencil next(stack: *mut usize, count: usize)
-        variant
-            imm count,
-            slot stack,
-    {
-        let stack = stack.add(COUNT);
-        become next(stack);
-    }
+stencil next(stack: usize, count: usize)
+    variant
+        imm count,
+        slot stack,
+{
+    let stack = (stack as *mut usize).add(count);
+    become next(stack as usize);
+}
 
-    stencil previous(stack: *mut usize, count: usize)
-        variant
-            imm count,
-            slot stack,
-    {
-        let stack = stack.sub(COUNT);
-        become next(stack);
-    }
+stencil previous(stack: usize, count: usize)
+    variant
+        imm count,
+        slot stack,
+{
+    let stack = (stack as *mut usize).sub(count);
+    become next(stack as usize);
+}
 
-    stencil increment(stack: *mut usize, by: usize)
-        variant
-            imm by,
-            slot stack,
-    {
-        stack.write(stack.read() + by);
-        become next(stack)
-    }
+stencil increment(stack: usize, by: usize)
+    variant
+        imm by,
+        slot stack,
+{
+    let stack = (stack as *mut usize)
+    stack.write(stack.read() + by);
+    become next(stack as usize)
+}
 
-    stencil decrement(stack: *mut usize, by: usize)
-        variant
-            imm by,
-            slot stack,
-    {
-        stack.write(stack.read() - by);
-        become next(stack)
-    }
+stencil decrement(stack: usize, by: usize)
+    variant
+        imm by,
+        slot stack,
+{
+    let stack = (stack as *mut usize)
+    stack.write(stack.read() - by);
+    become next(stack as usize)
+}
 
-    stencil put(stack: *mut usize, write: fn(usize))
-        variant
+stencil put(stack: usize, write: fn(usize))
+    variant
         imm write,
         slot stack,
-    {
-        write(stack.read());
-        become next(stack)
-    }
+{
+    let stack = (stack as *mut usize)
+    write(stack.read());
+    become next(stack as usize)
+}
 
 
-    stencil gets(stack: *mut usize, read: fn() -> usize)
-        variant
+stencil gets(stack: usize, read: fn() -> usize)
+    variant
         imm read,
         slot stack,
-    {
-        stack.write(read());
-        become next(stack)
+{
+    let stack = (stack as *mut usize)
+    stack.write(read());
+    become next(stack as usize)
+}
+
+stencil jump_forward(stack: usize)
+    variant
+        slot stack
+{
+    let stack = (stack as *mut usize)
+    if stack.read() == 0 {
+        become forward(stack as usize)
     }
+    become next(stack as usize)
+}
 
-    stencil jump_forward(stack: *mut usize)
-        variant
+
+stencil jump_backward(stack: usize)
+    variant
         slot stack
-    {
-        if stack.read() == 0 {
-            become forward(stack)
-        }
-        become next(stack)
+{
+    let stack = (stack as *mut usize)
+    if stack.read() != 0 {
+        become backward(stack as usize)
     }
+    become next(stack as usize)
+}
 
-
-    stencil jump_backward(stack: *mut usize)
-        variant
+stencil halt(stack: usize)
+    variant
         slot stack
-        {
-            if stack.read() != 0 {
-                become backward(stack)
-            }
-            become next(stack)
-        }
-
-    stencil halt(stack: *mut usize)
-        variant
-        slot stack
-        {
-            return;
-        }
+{
+    return;
+}
 
 });
 
