@@ -103,7 +103,6 @@ pub fn expand_variants2(variant: &StencilVariant, stencil_name: &str, idx: usize
     let variant_name: String = to_pascal_case(stencil_name);
 
     let variant_name = format_ident!("{variant_name}Variant{idx}");
-    let variant_args_name = format_ident!("{variant_name}Args");
     let variant_jumps_name = format_ident!("{variant_name}Jumps");
 
     let bytes = variant.bytes.iter();
@@ -123,9 +122,9 @@ pub fn expand_variants2(variant: &StencilVariant, stencil_name: &str, idx: usize
         });
 
         let default = if variant.immediates.is_empty() {
-            quote! { impl Default for #variant_args_name {
+            quote! { impl Default for #variant_name {
                 fn default() -> Self{
-                    #variant_args_name{}
+                    #variant_name{}
                 }
             }}
         } else {
@@ -133,7 +132,7 @@ pub fn expand_variants2(variant: &StencilVariant, stencil_name: &str, idx: usize
         };
 
         quote! {
-            pub struct #variant_args_name{
+            pub struct #variant_name{
                 #(#fields),*
             }
 
@@ -182,7 +181,7 @@ pub fn expand_variants2(variant: &StencilVariant, stencil_name: &str, idx: usize
 
         quote! {
             let __f = f;
-            let __args = args;
+            let __args = self;
             #(#fields)*
         }
     };
@@ -230,8 +229,6 @@ pub fn expand_variants2(variant: &StencilVariant, stencil_name: &str, idx: usize
     };
 
     quote! {
-        pub struct #variant_name(());
-
         #args_type
 
         #jumps_type
@@ -239,12 +236,11 @@ pub fn expand_variants2(variant: &StencilVariant, stencil_name: &str, idx: usize
         unsafe impl ::stucco::stencil::Variant for #variant_name{
             type Module = Module;
 
-            type Args = #variant_args_name;
             type Jumps = #variant_jumps_name;
 
             const BYTECODE: &[u8] = &[#(#bytes),*];
 
-            fn produce_immediates<F>(args: Self::Args, f: &mut F)
+            fn produce_immediates<F>(self, f: &mut F)
                 where F: FnMut(::stucco::stencil::Immediate)
             {
                 #produce_imm

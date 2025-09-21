@@ -1,3 +1,5 @@
+//! A reference brainfuck interpreter to compare the jit-compiled version to.
+
 use std::{
     env,
     io::{Read as _, Write},

@@ -68,8 +68,6 @@ pub unsafe trait Variant {
     /// The module to which this variant belongs to.
     type Module: Module;
 
-    /// Type containing input required to build to variant, like immediates.
-    type Args;
     /// Type containing the continuation of jumps which this stencil produces.
     type Jumps;
 
@@ -78,7 +76,7 @@ pub unsafe trait Variant {
 
     /// A function, which when called will callback with a set of immediate values produced from
     /// the given argument.
-    fn produce_immediates<F: FnMut(Immediate)>(args: Self::Args, f: &mut F);
+    fn produce_immediates<F: FnMut(Immediate)>(self, f: &mut F);
 
     /// A function, which when called will callback with a set of jumps
     fn collect_jumps<F: FnMut(Jump) -> Cont>(f: &mut F) -> Self::Jumps;

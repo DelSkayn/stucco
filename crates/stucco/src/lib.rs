@@ -16,7 +16,6 @@ struct InstantiatedJump {
 
 #[derive(Debug)]
 struct InstantiatedVariant {
-    name: &'static str,
     bytes: &'static [u8],
     jumps: Range<usize>,
     imms: Range<usize>,
@@ -38,7 +37,6 @@ impl<M: Module> Builder<M> {
             Builder {
                 __marker: PhantomData,
                 variants: vec![InstantiatedVariant {
-                    name: "ENTRY",
                     bytes: M::BYTECODE,
                     jumps: 0..1,
                     imms: 0..0,
@@ -54,7 +52,7 @@ impl<M: Module> Builder<M> {
         )
     }
 
-    pub fn then_variant<V>(&mut self, cont: Cont, args: V::Args) -> (JumpTarget, V::Jumps)
+    pub fn then_variant<V>(&mut self, cont: Cont, args: V) -> (JumpTarget, V::Jumps)
     where
         V: Variant<Module = M>,
     {
@@ -76,7 +74,6 @@ impl<M: Module> Builder<M> {
         self.jumps[cont.0].target = Some(jmp_target);
 
         self.variants.push(InstantiatedVariant {
-            name: std::any::type_name::<V>(),
             bytes: V::BYTECODE,
             jumps: jumps_range,
             imms,
