@@ -16,7 +16,6 @@ pub struct Bytecode<M> {
 impl<M: Module> Bytecode<M> {
     pub fn into_mapped_function(&self) -> MappedFunction<M> {
         let len = (self.code.len() + (4096 - 1)) & !(4096 - 1);
-        dbg!(len);
 
         let memory: *mut c_void = unsafe {
             rustix::mm::mmap_anonymous(

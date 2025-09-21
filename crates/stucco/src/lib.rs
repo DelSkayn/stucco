@@ -6,7 +6,7 @@ use std::{marker::PhantomData, ops::Range};
 pub use bytecode::{Bytecode, MappedFunction};
 use stencil::{Cont, Fallthrough, Immediate, Jump, Module, Variant};
 
-//pub use derive::{file, module};
+pub use derive::file;
 
 #[derive(Debug)]
 struct InstantiatedJump {
@@ -16,6 +16,7 @@ struct InstantiatedJump {
 
 #[derive(Debug)]
 struct InstantiatedVariant {
+    name: &'static str,
     bytes: &'static [u8],
     jumps: Range<usize>,
     imms: Range<usize>,
@@ -37,6 +38,7 @@ impl<M: Module> Builder<M> {
             Builder {
                 __marker: PhantomData,
                 variants: vec![InstantiatedVariant {
+                    name: "ENTRY",
                     bytes: M::BYTECODE,
                     jumps: 0..1,
                     imms: 0..0,
@@ -74,6 +76,7 @@ impl<M: Module> Builder<M> {
         self.jumps[cont.0].target = Some(jmp_target);
 
         self.variants.push(InstantiatedVariant {
+            name: std::any::type_name::<V>(),
             bytes: V::BYTECODE,
             jumps: jumps_range,
             imms,
@@ -87,13 +90,12 @@ impl<M: Module> Builder<M> {
     }
 
     pub fn build(mut self) -> Bytecode<M> {
+        // The order in which the variants are layed out.
+        // Contains the index of the variant to be writen to position n.
         let mut order = Vec::new();
         // TODO: use bitmap;
         let mut reached = vec![false; self.variants.len()];
         let mut stack = vec![0];
-
-        dbg!(&self.variants);
-        dbg!(&self.jumps);
 
         // Topologically sort the variants prefering fallthroughs wherever possible.
         while let Some(next) = stack.pop() {
@@ -134,7 +136,7 @@ impl<M: Module> Builder<M> {
                 .iter()
                 .find_map(|j| {
                     if let Fallthrough::Omit(x) = j.jump.fallthrough {
-                        if j.target.unwrap() == idx + 1 {
+                        if order.get(idx + 1).copied() == Some(j.target.unwrap()) {
                             Some(x)
                         } else {
                             None

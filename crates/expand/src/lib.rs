@@ -33,12 +33,12 @@ pub fn file(items: TokenStream) -> TokenStream {
     let env = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let path = Path::new(&env).join(path_lit.value);
 
-    let file = match std::fs::read_to_string(path) {
+    let file = match std::fs::read_to_string(&path) {
         Ok(x) => x,
         Err(e) => {
             return parser::Error::new(
                 path_lit.span,
-                format_args!("Failed to read template file: {e}"),
+                format_args!("Failed to read template file at '{}': {e}", path.display()),
             )
             .into_token_stream();
         }
