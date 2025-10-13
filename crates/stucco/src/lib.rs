@@ -6,6 +6,7 @@ use std::{marker::PhantomData, ops::Range};
 pub use bytecode::{Bytecode, MappedFunction};
 use stencil::{Cont, Fallthrough, Immediate, Jump, Module, Variant};
 
+#[cfg(feature = "derive")]
 pub use derive::file;
 
 #[derive(Debug)]
@@ -29,7 +30,11 @@ pub struct Builder<M> {
     immediates: Vec<Immediate>,
 }
 
+/// An id of a place to jump towards
 pub struct JumpTarget(usize);
+
+/// An place on the stack where the result of a computation is placed.
+pub struct StackSlot(usize);
 
 impl<M: Module> Builder<M> {
     pub fn new() -> (Self, Cont) {

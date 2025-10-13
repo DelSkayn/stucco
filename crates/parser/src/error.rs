@@ -3,7 +3,7 @@ use std::fmt;
 use ast::PushNodeError;
 pub use imp::render;
 use proc_macro2::{Delimiter, Group, Ident, Literal, Punct, Spacing, TokenStream, TokenTree};
-use token::{Span, Spanned, TokenError};
+use token::{Span, TokenError};
 
 #[derive(Debug)]
 pub struct Error {

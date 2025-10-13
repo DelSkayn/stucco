@@ -9,7 +9,7 @@ enum Truncation {
     Both,
 }
 
-pub fn render_line(source: &str, location: Range<usize>) -> String {
+pub fn render_line(source: &str, location: Range<usize>, terminal: bool) -> String {
     if source == "" {
         panic!("an empty string should not be able to generate an error")
     }
@@ -37,13 +37,21 @@ pub fn render_line(source: &str, location: Range<usize>) -> String {
 
     for (idx, c) in snippet_str.chars().enumerate() {
         if idx == offset {
-            write!(buf, "\x1b[30;47m").unwrap()
+            if terminal {
+                write!(buf, "\x1b[30;47m").unwrap()
+            } else {
+                write!(buf, "%").unwrap()
+            }
         }
 
         buf.push(c);
 
         if idx + 1 == offset + error_columns {
-            write!(buf, "\x1b[0m").unwrap()
+            if terminal {
+                write!(buf, "\x1b[0m").unwrap()
+            } else {
+                write!(buf, "%").unwrap()
+            }
         }
     }
 

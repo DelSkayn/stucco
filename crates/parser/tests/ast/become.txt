@@ -1,0 +1,29 @@
+stencil foo(){
+    become bar(1usize,"a")
+}
+----------
+[0]Module {
+  sym: Some,
+  stencils: Some([
+    [0]Stencil {
+      sym: [0]Symbol {
+        name: [0]Ident{ sym: foo, span: 8..11 },
+      },
+      parameters: Some,
+      variants: Some,
+      output: Some,
+      body: [3]Expr::Block([0]Block {
+        body: Some([
+          [2]Expr::Become([0]Become {
+            callee: [1]Ident{ sym: bar, span: 26..29 },
+            args: Some([
+              [0]Expr::Literal([0]Int(LitInt { value: Unsigned(1), suffix: Usize, span: Span(30..36) })),
+              [1]Expr::Literal([1]Str(LitStr { value: "a", span: Span(37..40) })),
+            ]),
+          }),
+        ]),
+        returns_last: true,
+      }),
+    },
+  ]),
+}

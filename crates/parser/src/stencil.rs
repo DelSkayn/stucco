@@ -9,7 +9,7 @@ impl Parse for ast::Stencil {
         let sym = parser.parse_push()?;
 
         let parameters =
-            parser.parse_parenthesized(|parser| parser.parse_terminated::<_, T![,]>())?;
+            parser.parse_parenthesized(|parser, _| parser.parse_terminated::<_, T![,]>())?;
 
         let output = if let Some(_) = parser.eat::<T![->]>() {
             Some(parser.parse_push()?)
@@ -27,6 +27,7 @@ impl Parse for ast::Stencil {
 
         let body = parser.parse_push()?;
         let body = parser.push(ast::Expr::Block(body))?;
+        let span = parser.span_since(span);
 
         Ok(ast::Stencil {
             sym,

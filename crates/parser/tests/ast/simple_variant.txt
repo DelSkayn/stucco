@@ -1,0 +1,41 @@
+stencil foo(a: i64)
+    variant bar:
+        imm a
+{
+}
+----------
+[0]Module {
+  sym: Some,
+  stencils: Some([
+    [0]Stencil {
+      sym: [0]Symbol {
+        name: [0]Ident{ sym: foo, span: 8..11 },
+      },
+      parameters: Some([
+        [0]Parameter {
+          sym: [1]Symbol {
+            name: [1]Ident{ sym: a, span: 12..13 },
+          },
+          ty: [0]Type::Direct([2]Ident{ sym: i64, span: 15..18 }),
+        },
+      ]),
+      variants: Some([
+        [0]Variant {
+          name: [3]Ident{ sym: bar, span: 32..35 },
+          variations: Some([
+            [0]Variation::Immediate([0]VariationImmediate {
+              sym: [2]Symbol {
+                name: [1]Ident{ sym: a, span: 12..13 },
+              },
+            }),
+          ]),
+        },
+      ]),
+      output: Some,
+      body: [0]Expr::Block([0]Block {
+        body: Some,
+        returns_last: false,
+      }),
+    },
+  ]),
+}

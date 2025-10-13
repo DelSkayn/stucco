@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-#default = ["stand-alone"]
+default = ["stand-alone"]
 stand-alone = ["inkwell/llvm18-1-force-dynamic", "llvm-sys/force-dynamic"]
 proc-macro = ["inkwell/llvm18-1-no-llvm-linking", "llvm-sys/no-llvm-linking"]
 

@@ -3,5 +3,11 @@ name = "stucco_common"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+test = []
+
 [dependencies]
 hashbrown = { workspace = true, features = ["raw"]}
+
+[dev-depencies]
+common = { workspace = true, features = ["test"] }

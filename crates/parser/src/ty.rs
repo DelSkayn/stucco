@@ -37,7 +37,8 @@ impl Parse for ast::Type {
 impl Parse for ast::TypeFn {
     fn parse(parser: &mut Parser) -> Result<Self> {
         let span = parser.expect::<T![fn]>()?.0;
-        let params = parser.parse_parenthesized(|parser| parser.parse_terminated::<_, T![,]>())?;
+        let params =
+            parser.parse_parenthesized(|parser, _| parser.parse_terminated::<_, T![,]>())?;
 
         let output = if let Some(_) = parser.eat::<T![->]>() {
             Some(parser.parse_push()?)
@@ -81,7 +82,7 @@ impl Parse for ast::TypeReference {
 impl Parse for ast::TypeArray {
     fn parse(parser: &mut Parser) -> Result<Self> {
         let span = parser.span();
-        parser.parse_bracketed(|parser| {
+        parser.parse_bracketed(|parser, _| {
             let ty = parser.parse_push()?;
             parser.expect::<T![;]>()?;
             let len = parser.parse_push()?;
@@ -97,7 +98,8 @@ impl Parse for ast::TypeArray {
 impl Parse for ast::TypeTuple {
     fn parse(parser: &mut Parser) -> Result<Self> {
         let span = parser.span();
-        let fields = parser.parse_parenthesized(|parser| parser.parse_terminated::<_, T![,]>())?;
+        let fields =
+            parser.parse_parenthesized(|parser, _| parser.parse_terminated::<_, T![,]>())?;
         Ok(ast::TypeTuple { fields, span })
     }
 }

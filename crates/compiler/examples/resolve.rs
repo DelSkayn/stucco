@@ -103,7 +103,7 @@ where
     }
 
     fn visit_symbol(&mut self, ast: &Ast, f: ast::NodeId<ast::Symbol>) -> Result<(), Self::Error> {
-        let line = error::render_line(self.source, f.ast_span(ast).byte_range());
+        let line = error::render_line(self.source, f.ast_span(ast).byte_range(), true);
         write!(self.fmt, "{} @ '{}'", ast[f].name.index(&ast), line.trim())?;
         if let Some(x) = self.symbols.ast_to_symbol.get(f).copied().and_then(|x| x) {
             writeln!(self.fmt, " = [{:?}]", x.idx())

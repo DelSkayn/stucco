@@ -20,6 +20,7 @@ pub struct Stencil {
 
 #[derive(Debug)]
 pub struct StencilVariant {
+    pub name: String,
     pub bytes: Vec<u8>,
     pub immediates: HashMap<String, Immediate>,
     pub jumps: HashMap<String, Jump>,
@@ -96,7 +97,7 @@ pub fn extract_entry_stencil(object_file_bytes: &[u8]) -> EntryStencil {
 }
 
 /// Extract a stencil from a compiled object file.
-pub fn extract_stencil_variant(object_file_bytes: &[u8]) -> StencilVariant {
+pub fn extract_stencil_variant(name: String, object_file_bytes: &[u8]) -> StencilVariant {
     let Ok(object) = ElfFile64::<LittleEndian>::parse(&object_file_bytes) else {
         panic!("llvm produced invalid object bytes");
     };
@@ -150,6 +151,7 @@ pub fn extract_stencil_variant(object_file_bytes: &[u8]) -> StencilVariant {
     }
 
     StencilVariant {
+        name,
         bytes: text,
         jumps,
         immediates,

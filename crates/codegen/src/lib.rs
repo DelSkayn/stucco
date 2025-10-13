@@ -105,7 +105,10 @@ impl CodeGen {
             for v in self.ast.iter_list_node(self.ast[s].variants) {
                 let module = self.generate_variant(s, v);
                 let object = module.into_object(target);
-                let variant = obj::extract_stencil_variant(&object);
+                let variant = obj::extract_stencil_variant(
+                    self.ast[v].name.index(&self.ast).to_string(),
+                    &object,
+                );
                 stencil.variants.push(variant);
             }
             set.stencils.insert(

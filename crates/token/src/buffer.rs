@@ -106,6 +106,10 @@ impl<'a> TokenSlice<'a> {
         }
     }
 
+    pub fn prev(&self) -> &'a TokenType {
+        unsafe { self.cur.get().as_ref() }
+    }
+
     pub fn cur(&self) -> Option<&'a TokenType> {
         if self.is_empty() {
             None
@@ -190,6 +194,22 @@ impl<'a> TokenSlice<'a> {
 
     pub fn is_empty(&self) -> bool {
         self.cur.get() == self.end
+    }
+
+    pub fn prev_span(&self) -> Span {
+        match self.prev() {
+            TokenType::Ident(ident) => ident.span().into(),
+            TokenType::Literal(literal) => literal.span(),
+            TokenType::Punct(punct) => punct.span().into(),
+            TokenType::Back(count) => {
+                let TokenType::Group(g, _) = (unsafe { self.cur.get().sub(*count).as_ref() })
+                else {
+                    unreachable!()
+                };
+                g.span_close().into()
+            }
+            TokenType::Group(g, _) => g.span_open().into(),
+        }
     }
 
     pub fn span(&self) -> Span {

@@ -1,0 +1,22 @@
+stencil previous(a: usize)
+    variant base:
+        imm a,
+{
+    let b = a;
+    return b;
+}
+----------
+module {
+  'stencil %previous%(a: usize)' = NOT INFERED
+  'stencil previous(%a%: usize)' = "usize"
+  'imm %a%,' = "usize"
+    '%{%'
+      '%let% b = a;' = "()"
+        'let %b% = a;' = "usize"
+        'let b = %a%;' = "usize"
+          'let b = %a%;' = "usize"
+      '%return% b;' = "!"
+        'return %b%;' = "usize"
+          'return %b%;' = "usize"
+    } = "!"
+}

@@ -94,7 +94,7 @@ fn main() {
                 next = builder
                     .then_variant(
                         next,
-                        bf::NextVariant0 {
+                        bf::NextVariantBase {
                             count: count as u64,
                         },
                     )
@@ -106,7 +106,7 @@ fn main() {
                 next = builder
                     .then_variant(
                         next,
-                        bf::PreviousVariant0 {
+                        bf::PreviousVariantBase {
                             count: count as u64,
                         },
                     )
@@ -116,14 +116,14 @@ fn main() {
             b'+' => {
                 let count = reader.eat_count(b'+');
                 next = builder
-                    .then_variant(next, bf::IncrementVariant0 { by: count as u64 })
+                    .then_variant(next, bf::IncrementVariantBase { by: count as u64 })
                     .1
                     .next;
             }
             b'-' => {
                 let count = reader.eat_count(b'-');
                 next = builder
-                    .then_variant(next, bf::DecrementVariant0 { by: count as u64 })
+                    .then_variant(next, bf::DecrementVariantBase { by: count as u64 })
                     .1
                     .next;
             }
@@ -132,7 +132,7 @@ fn main() {
                 next = builder
                     .then_variant(
                         next,
-                        bf::GetsVariant0 {
+                        bf::GetsVariantBase {
                             read: unsafe { std::mem::transmute(gets as fn() -> u64) },
                         },
                     )
@@ -144,7 +144,7 @@ fn main() {
                 next = builder
                     .then_variant(
                         next,
-                        bf::PutVariant0 {
+                        bf::PutVariantBase {
                             write: unsafe { std::mem::transmute(put as fn(u64)) },
                         },
                     )
@@ -153,13 +153,15 @@ fn main() {
             }
             b'[' => {
                 reader.next();
-                let (tgt, jumps) = builder.then_variant(next, bf::JumpForwardVariant0::default());
+                let (tgt, jumps) =
+                    builder.then_variant(next, bf::JumpForwardVariantBase::default());
                 next = jumps.next;
                 jump_stack.push((tgt, jumps.forward));
             }
             b']' => {
                 reader.next();
-                let (tgt, jumps) = builder.then_variant(next, bf::JumpBackwardVariant0::default());
+                let (tgt, jumps) =
+                    builder.then_variant(next, bf::JumpBackwardVariantBase::default());
                 next = jumps.next;
                 let (backward_tgt, forward) = jump_stack.pop().expect("Unbalanced brackets!");
                 builder.then_jump(jumps.backward, backward_tgt);
@@ -174,7 +176,7 @@ fn main() {
     assert!(jump_stack.is_empty(), "Unbalanced brackets");
 
     // Add a halt at the end so that all continuations are complete.
-    builder.then_variant(next, bf::HaltVariant0 {});
+    builder.then_variant(next, bf::HaltVariantBase {});
     let bytes = builder.build();
 
     // Map the compiled function into executable memory.

@@ -149,7 +149,12 @@ where
     W: fmt::Write,
 {
     fn fmt(&self, fmt: &mut AstFormatter<L, W>) -> fmt::Result {
-        write!(fmt, "{:?}", self)
+        write!(
+            fmt,
+            "Ident{{ sym: {}, span: {:?} }}",
+            self.to_string(),
+            self.span().byte_range()
+        )
     }
 }
 

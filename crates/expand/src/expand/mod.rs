@@ -1,5 +1,5 @@
 use codegen::{StencilSet, StencilVariant};
-use proc_macro2::{Literal, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
 use crate::compile::CompilationResult;
@@ -75,8 +75,7 @@ pub fn expand_stencils(stencils: &StencilSet) -> Vec<TokenStream> {
                 .1
                 .variants
                 .iter()
-                .enumerate()
-                .map(|(idx, variant)| expand_variants2(variant, stencil.0, idx))
+                .map(|variant| expand_variants(variant, stencil.0))
         })
         .collect()
 }
@@ -99,10 +98,11 @@ pub fn to_pascal_case(name: &str) -> String {
     res
 }
 
-pub fn expand_variants2(variant: &StencilVariant, stencil_name: &str, idx: usize) -> TokenStream {
-    let variant_name: String = to_pascal_case(stencil_name);
+pub fn expand_variants(variant: &StencilVariant, stencil_name: &str) -> TokenStream {
+    let stencil_name: String = to_pascal_case(stencil_name);
+    let variant_name: String = to_pascal_case(&variant.name);
 
-    let variant_name = format_ident!("{variant_name}Variant{idx}");
+    let variant_name = format_ident!("{stencil_name}Variant{}", variant_name);
     let variant_jumps_name = format_ident!("{variant_name}Jumps");
 
     let bytes = variant.bytes.iter();

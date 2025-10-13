@@ -1,8 +1,8 @@
-use ast::{BinOp, UnOp};
+use ast::{AstSpanned, BinOp, UnOp};
 use proc_macro2::Delimiter;
 
 use crate::{Parse, Parser, Result, prime::parse_prime};
-use ::token::{T, token};
+use ::token::{Spanned, T, token};
 
 impl Parse for ast::Expr {
     fn parse(parser: &mut Parser) -> Result<Self> {
@@ -178,7 +178,7 @@ fn parse_unary(parser: &mut Parser) -> Result<ast::Expr> {
 
 fn parse_call(parser: &mut Parser, callee: ast::Expr) -> Result<ast::Expr> {
     let span = parser.span();
-    let args = parser.parse_parenthesized(|parser| parser.parse_terminated::<_, T![,]>())?;
+    let args = parser.parse_parenthesized(|parser, _| parser.parse_terminated::<_, T![,]>())?;
     let callee = parser.push(callee)?;
     let call = parser.push(ast::Call {
         func: callee,
@@ -193,7 +193,7 @@ fn parse_dot(parser: &mut Parser, base: ast::Expr) -> Result<ast::Expr> {
     if parser.peek2::<token::Paren>() {
         let ident = parser.expect()?;
         let ident = parser.push(ident)?;
-        let args = parser.parse_parenthesized(|parser| parser.parse_terminated::<_, T![,]>())?;
+        let args = parser.parse_parenthesized(|parser, _| parser.parse_terminated::<_, T![,]>())?;
         let receiver = parser.push(base)?;
         let call = parser.push(ast::Method {
             receiver,
@@ -218,7 +218,8 @@ fn parse_dot(parser: &mut Parser, base: ast::Expr) -> Result<ast::Expr> {
 fn parse_cast(parser: &mut Parser, base: ast::Expr) -> Result<ast::Expr> {
     let expr = parser.push(base)?;
     let span = parser.expect::<T![as]>()?.0;
-    let ty = parser.parse_push()?;
+    let ty = parser.parse_push::<ast::Type>()?;
+    let span = span.try_join(parser[ty].ast_span(parser));
     let c = parser.push(ast::Cast { expr, ty, span })?;
 
     Ok(ast::Expr::Cast(c))

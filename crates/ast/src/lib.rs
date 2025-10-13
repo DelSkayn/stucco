@@ -39,6 +39,7 @@ library!(Library {
     unary: Vec<UnaryExpr>,
     if_: Vec<If>,
     while_: Vec<While>,
+    loop_: Vec<Loop>,
     block: Vec<Block>,
 
     literal: Vec<Lit>,
@@ -80,7 +81,7 @@ ast_enum! {
         Unary(NodeId<UnaryExpr>),
         Block(NodeId<Block>),
         Cast(NodeId<Cast>),
-        Loop(NodeId<Block>),
+        Loop(NodeId<Loop>),
         While(NodeId<While>),
         Let(NodeId<Let>),
         Continue(Span),
@@ -98,7 +99,7 @@ ast_enum! {
 }
 
 ast_struct! {
-        pub struct If {
+    pub struct If {
         pub condition: NodeId<Expr>,
         pub then: NodeId<Block>,
         pub otherwise: Option<NodeId<Block>>,
@@ -106,9 +107,15 @@ ast_struct! {
 }
 
 ast_struct! {
-        pub struct While {
+    pub struct While {
         pub condition: NodeId<Expr>,
         pub then: NodeId<Block>,
+    }
+}
+
+ast_struct! {
+    pub struct Loop {
+        pub body: NodeId<Block>,
     }
 }
 
@@ -326,6 +333,7 @@ ast_struct! {
 
 ast_struct! {
     pub struct Variant {
+        pub name: NodeId<Ident>,
         pub variations: Option<NodeListId<Variation>>
     }
 }

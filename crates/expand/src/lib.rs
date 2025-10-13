@@ -1,12 +1,10 @@
-use ast::{Ast, NodeId};
-use codegen::{StencilSet, StencilVariant, Target};
 use compile::CompilationError;
 use compiler::infer::TypeError;
-use quote::{format_ident, quote};
+use quote::quote;
 use std::path::Path;
 
-use parser::{Parser, parse_external_module, parse_wrapped_module};
-use proc_macro2::{Literal, TokenStream};
+use parser::Parser;
+use proc_macro2::TokenStream;
 use token::{
     T,
     token::{Ident, LitStr},
@@ -16,7 +14,7 @@ pub mod compile;
 pub mod expand;
 
 pub fn string_to_compile_error(s: String) -> TokenStream {
-    quote! { ::core::compile_error!($s) }
+    quote! { ::core::compile_error!(#s) }
 }
 
 pub fn file(items: TokenStream) -> TokenStream {

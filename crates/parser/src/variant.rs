@@ -5,6 +5,12 @@ use token::T;
 impl Parse for ast::Variant {
     fn parse(parser: &mut Parser) -> Result<Self> {
         let span = parser.expect::<T![variant]>()?.0;
+
+        let name = parser.expect()?;
+        let name = parser.push(name)?;
+
+        parser.expect::<T![:]>()?;
+
         let mut head = None;
         let mut current = None;
         loop {
@@ -27,6 +33,7 @@ impl Parse for ast::Variant {
         }
 
         Ok(Variant {
+            name,
             span,
             variations: head,
         })

@@ -15,9 +15,8 @@ pub mod error;
 mod expr;
 mod prime;
 mod stencil;
-#[cfg(test)]
-mod test;
 mod ty;
+mod util;
 mod variant;
 
 pub use error::Error;
@@ -148,7 +147,7 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     pub fn parse_delimiter<F, R>(&mut self, delim: Delimiter, f: F) -> Result<R>
     where
-        F: FnOnce(&mut Parser) -> Result<R>,
+        F: FnOnce(&mut Parser, Span) -> Result<R>,
     {
         let Some((group, slice)) = self.slice.group() else {
             println!("{}", std::backtrace::Backtrace::force_capture());
@@ -175,7 +174,7 @@ impl<'a, 'b> Parser<'a, 'b> {
             slice,
             ast: self.ast,
         };
-        let res = f(&mut parser);
+        let res = f(&mut parser, group.span().into());
         if res.is_ok() {
             self.slice.advance_group();
         }
@@ -184,21 +183,21 @@ impl<'a, 'b> Parser<'a, 'b> {
 
     pub fn parse_braced<F, R>(&mut self, f: F) -> Result<R>
     where
-        F: FnOnce(&mut Parser) -> Result<R>,
+        F: FnOnce(&mut Parser, Span) -> Result<R>,
     {
         self.parse_delimiter(Delimiter::Brace, f)
     }
 
     pub fn parse_bracketed<F, R>(&mut self, f: F) -> Result<R>
     where
-        F: FnOnce(&mut Parser) -> Result<R>,
+        F: FnOnce(&mut Parser, Span) -> Result<R>,
     {
         self.parse_delimiter(Delimiter::Bracket, f)
     }
 
     pub fn parse_parenthesized<F, R>(&mut self, f: F) -> Result<R>
     where
-        F: FnOnce(&mut Parser) -> Result<R>,
+        F: FnOnce(&mut Parser, Span) -> Result<R>,
     {
         self.parse_delimiter(Delimiter::Parenthesis, f)
     }
@@ -255,6 +254,14 @@ impl<'a, 'b> Parser<'a, 'b> {
             )))
         }
     }
+
+    pub fn last_span(&self) -> Span {
+        self.slice.prev_span()
+    }
+
+    pub fn span_since(&self, span: Span) -> Span {
+        span.try_join(self.last_span())
+    }
 }
 
 impl Deref for Parser<'_, '_> {
@@ -276,8 +283,7 @@ pub fn parse_wrapped_module(parser: &mut Parser) -> Result<NodeId<ast::Module>> 
     let span = parser.expect::<T![mod]>()?.0;
     let sym = parser.parse_push()?;
 
-    let mut end_span = None;
-    let functions = parser.parse_braced(|parser| {
+    let functions = parser.parse_braced(|parser, _| {
         let mut head = None;
         let mut current = None;
         loop {
@@ -288,12 +294,10 @@ pub fn parse_wrapped_module(parser: &mut Parser) -> Result<NodeId<ast::Module>> 
             let func = parser.parse_push()?;
             parser.push_list(&mut head, &mut current, func)?;
         }
-        end_span = Some(parser.span());
         Ok(head)
     })?;
 
-    let end_span = end_span.unwrap();
-    let span = span.try_join(end_span);
+    let span = parser.span_since(span);
 
     parser.push(ast::Module {
         sym: Some(sym),

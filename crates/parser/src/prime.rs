@@ -1,4 +1,4 @@
-use crate::{Parse, Parser, Result};
+use crate::{Parse, Parser, Result, util};
 use ::token::{T, token};
 
 pub fn parse_prime(parser: &mut Parser) -> Result<ast::Expr> {
@@ -35,14 +35,18 @@ pub fn parse_prime(parser: &mut Parser) -> Result<ast::Expr> {
         return Ok(ast::Expr::Literal(lit));
     }
     if parser.peek::<token::Paren>() {
-        let expr = parser.parse_parenthesized(|parser| {
+        return parser.parse_parenthesized(|parser, span| {
+            if parser.is_empty() {
+                let lit = parser.push(token::Lit::Nil(span))?;
+                return Ok(ast::Expr::Literal(lit));
+            }
+
             let res = parser.parse_push()?;
             if !parser.is_empty() {
                 return Err(parser.error("expected expression to end"));
             }
-            Ok(res)
-        })?;
-        return Ok(ast::Expr::Covered(expr));
+            Ok(ast::Expr::Covered(res))
+        });
     }
     let parse = parser.parse_push()?;
     Ok(ast::Expr::Symbol(parse))
@@ -82,13 +86,24 @@ impl Parse for ast::While {
     }
 }
 
+impl Parse for ast::Loop {
+    fn parse(parser: &mut Parser) -> Result<Self> {
+        let span = parser.expect::<T![loop]>()?.0;
+        let body = parser.parse_push()?;
+
+        let span = parser.span_since(span);
+
+        Ok(ast::Loop { span, body })
+    }
+}
+
 impl Parse for ast::Become {
     fn parse(parser: &mut Parser) -> Result<Self> {
         let span = parser.span();
         parser.expect::<T![become]>()?;
         let callee = parser.expect()?;
         let callee = parser.push(callee)?;
-        let args = parser.parse_parenthesized(|parser| parser.parse_terminated::<_, T![,]>())?;
+        let args = parser.parse_parenthesized(|parser, _| parser.parse_terminated::<_, T![,]>())?;
         Ok(Self { callee, args, span })
     }
 }
@@ -161,8 +176,10 @@ impl Parse for ast::Symbol {
 impl Parse for ast::Block {
     fn parse(parser: &mut Parser) -> Result<Self> {
         let span = parser.span();
+
         let mut returns_last = false;
-        let body = parser.parse_braced(|parser| {
+
+        let body = parser.parse_braced(|parser, _| {
             let mut head = None;
             let mut current = None;
             loop {
@@ -175,13 +192,18 @@ impl Parse for ast::Block {
 
                 returns_last = true;
 
-                // TODO: Handle semicolons better
-                if let Some(_) = parser.eat::<T![;]>() {
-                    returns_last = false;
+                if util::expr_needs_semicolon(parser, expr) {
+                    if !parser.is_empty() {
+                        parser.expect::<T![;]>()?;
+                    }
+                } else {
+                    returns_last = parser.eat::<T![;]>().is_some();
                 }
             }
             Ok(head)
         })?;
+
+        let span = parser.span_since(span);
 
         Ok(ast::Block {
             body,

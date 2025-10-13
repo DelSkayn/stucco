@@ -1,0 +1,43 @@
+stencil foo(){
+    while false {
+        break
+    }
+    1 + 1;
+}
+----------
+[0]Module {
+  sym: Some,
+  stencils: Some([
+    [0]Stencil {
+      sym: [0]Symbol {
+        name: [0]Ident{ sym: foo, span: 8..11 },
+      },
+      parameters: Some,
+      variants: Some,
+      output: Some,
+      body: [6]Expr::Block([1]Block {
+        body: Some([
+          [2]Expr::While([0]While {
+            condition: [0]Expr::Symbol([1]Symbol {
+              name: [1]Ident{ sym: false, span: 25..30 },
+            }),
+            then: [0]Block {
+              body: Some([
+                [1]Expr::Break([0]Break {
+                  expr: Some,
+                }),
+              ]),
+              returns_last: true,
+            },
+          }),
+          [5]Expr::Binary([0]BinaryExpr {
+            left: [4]Expr::Literal([0]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(57..58) })),
+            op: Add,
+            right: [3]Expr::Literal([1]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(61..62) })),
+          }),
+        ]),
+        returns_last: true,
+      }),
+    },
+  ]),
+}

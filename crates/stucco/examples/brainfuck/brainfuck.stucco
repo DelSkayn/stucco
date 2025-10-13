@@ -10,7 +10,7 @@ stencil next(stack: usize, count: usize)
     // In the below variant the `count` input is an immediate which means it will be backed in 
     // when compiling the jit function.
     // `stack` is a slot which means it will b read from the from the stack.
-    variant
+    variant base:
         imm count,
         slot stack,
 {
@@ -23,7 +23,7 @@ stencil next(stack: usize, count: usize)
 }
     
 stencil previous(stack: usize, count: usize)
-    variant
+    variant base:
         imm count,
         slot stack,
 {
@@ -32,7 +32,7 @@ stencil previous(stack: usize, count: usize)
 }
 
 stencil increment(stack: usize, by: usize)
-    variant
+    variant base:
         imm by,
         slot stack,
 {
@@ -42,7 +42,7 @@ stencil increment(stack: usize, by: usize)
 }
 
 stencil decrement(stack: usize, by: usize)
-    variant
+    variant base:
         imm by,
         slot stack,
 {
@@ -52,7 +52,7 @@ stencil decrement(stack: usize, by: usize)
 }
 
 stencil put(stack: usize, write: fn(usize))
-    variant
+    variant base:
         imm write,
         slot stack,
 {
@@ -63,7 +63,7 @@ stencil put(stack: usize, write: fn(usize))
 
 
 stencil gets(stack: usize, read: fn() -> usize)
-    variant
+    variant base:
         imm read,
         slot stack,
 {
@@ -73,7 +73,7 @@ stencil gets(stack: usize, read: fn() -> usize)
 }
 
 stencil jump_forward(stack: usize)
-    variant
+    variant base:
         slot stack
 {
     let stack = (stack as *mut usize)
@@ -85,7 +85,7 @@ stencil jump_forward(stack: usize)
 
 
 stencil jump_backward(stack: usize)
-    variant
+    variant base:
         slot stack
 {
     let stack = (stack as *mut usize)
@@ -96,7 +96,7 @@ stencil jump_backward(stack: usize)
 }
 
 stencil halt(stack: usize)
-    variant
+    variant base:
         slot stack
 {
     // a `return` statement will not return from the variant but actually from the entire jit-compiled function. 

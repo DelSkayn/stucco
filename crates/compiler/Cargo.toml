@@ -3,6 +3,10 @@ name = "stucco_compiler"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["dev"]
+dev = []
+
 [dependencies]
 ast = { workspace = true, features = ["span-locations"] }
 bitflags = "2.9.1"
@@ -12,3 +16,16 @@ token = { workspace = true }
 
 [dev-dependencies]
 parser = { workspace = true }
+common = { workspace = true, features = ["test"] }
+
+
+[[example]]
+name = "resolve"
+path = "examples/resolve.rs"
+required-features = ["dev"]
+
+
+[[example]]
+name = "type_check"
+path = "examples/type_check.rs"
+required-features = ["dev"]

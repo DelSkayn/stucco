@@ -16,3 +16,4 @@ proc-macro2 = { workspace = true }
 
 [dev-dependencies]
 ast = { workspace = true, features = ["print"] }
+common = { workspace = true, features = ["test"] }

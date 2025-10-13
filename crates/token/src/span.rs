@@ -1,9 +1,15 @@
-use std::hash::Hasher;
+use std::{fmt, hash::Hasher};
 
 use proc_macro2::Ident;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct Span(proc_macro2::Span);
+
+impl fmt::Debug for Span {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Span").field(&self.0.byte_range()).finish()
+    }
+}
 
 impl std::hash::Hash for Span {
     fn hash<H: Hasher>(&self, _state: &mut H) {}

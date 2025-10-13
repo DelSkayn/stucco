@@ -1,0 +1,20 @@
+stencil foo(){
+}
+----------
+[0]Module {
+  sym: Some,
+  stencils: Some([
+    [0]Stencil {
+      sym: [0]Symbol {
+        name: [0]Ident{ sym: foo, span: 8..11 },
+      },
+      parameters: Some,
+      variants: Some,
+      output: Some,
+      body: [0]Expr::Block([0]Block {
+        body: Some,
+        returns_last: false,
+      }),
+    },
+  ]),
+}

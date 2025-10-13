@@ -1,0 +1,40 @@
+stencil foo(){
+    loop {
+        break
+    }
+    1 + 1;
+}
+----------
+[0]Module {
+  sym: Some,
+  stencils: Some([
+    [0]Stencil {
+      sym: [0]Symbol {
+        name: [0]Ident{ sym: foo, span: 8..11 },
+      },
+      parameters: Some,
+      variants: Some,
+      output: Some,
+      body: [5]Expr::Block([1]Block {
+        body: Some([
+          [1]Expr::Loop([0]Loop {
+            body: [0]Block {
+              body: Some([
+                [0]Expr::Break([0]Break {
+                  expr: Some,
+                }),
+              ]),
+              returns_last: true,
+            },
+          }),
+          [4]Expr::Binary([0]BinaryExpr {
+            left: [3]Expr::Literal([0]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(50..51) })),
+            op: Add,
+            right: [2]Expr::Literal([1]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(54..55) })),
+          }),
+        ]),
+        returns_last: true,
+      }),
+    },
+  ]),
+}

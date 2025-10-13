@@ -136,6 +136,7 @@ pub enum Lit {
     Str(LitStr),
     Int(LitInt),
     Bool(LitBool),
+    Nil(Span),
 }
 impl fmt::Display for Lit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -143,6 +144,7 @@ impl fmt::Display for Lit {
             Lit::Str(lit_str) => lit_str.fmt(f),
             Lit::Int(lit_int) => lit_int.fmt(f),
             Lit::Bool(lit_bool) => lit_bool.fmt(f),
+            Lit::Nil(_) => write!(f, "()"),
         }
     }
 }
@@ -152,6 +154,7 @@ impl Spanned for Lit {
             Lit::Str(lit_str) => lit_str.span(),
             Lit::Int(lit_int) => lit_int.span(),
             Lit::Bool(lit_bool) => lit_bool.span(),
+            Lit::Nil(s) => *s,
         }
     }
 }

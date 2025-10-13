@@ -1,0 +1,29 @@
+stencil foo(){
+    return 1 + 1
+}
+----------
+[0]Module {
+  sym: Some,
+  stencils: Some([
+    [0]Stencil {
+      sym: [0]Symbol {
+        name: [0]Ident{ sym: foo, span: 8..11 },
+      },
+      parameters: Some,
+      variants: Some,
+      output: Some,
+      body: [4]Expr::Block([0]Block {
+        body: Some([
+          [3]Expr::Return([0]Return {
+            expr: Some([2]Expr::Binary([0]BinaryExpr {
+              left: [1]Expr::Literal([0]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(26..27) })),
+              op: Add,
+              right: [0]Expr::Literal([1]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(30..31) })),
+            })),
+          }),
+        ]),
+        returns_last: true,
+      }),
+    },
+  ]),
+}

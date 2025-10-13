@@ -519,6 +519,7 @@ impl<'ctx> VariantGen<'ctx> {
                     self.ctx.context.bool_type().const_int(0, false).into()
                 }
             }
+            Lit::Nil(_) => todo!(),
         }
     }
 }
