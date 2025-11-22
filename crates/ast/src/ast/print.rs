@@ -1,6 +1,6 @@
-use super::{Ast, Node, NodeId, NodeLibrary, NodeListId, Span};
+use super::{Ast, NodeId, NodeLibrary, NodeListId, Span};
 use common::render::IndentFormatter;
-use std::fmt;
+use std::{any::Any, fmt};
 use token::token::{Ident, Lit};
 
 pub struct AstRender<'a, L, N> {
@@ -53,7 +53,7 @@ where
     pub fn scope<N, F>(&mut self, n: NodeId<N>, f: F) -> fmt::Result
     where
         F: for<'b> FnOnce(&'b N, &'b mut AstFormatter<L, W>) -> fmt::Result,
-        N: 'static + Node,
+        N: 'static + Any,
     {
         let borrow = &self.ast[n];
         let res = {
@@ -113,7 +113,7 @@ where
     L: NodeLibrary,
     W: fmt::Write,
     NodeId<T>: AstDisplay<L, W>,
-    T: Node,
+    T: Any,
 {
     fn fmt(&self, fmt: &mut AstFormatter<L, W>) -> fmt::Result {
         writeln!(fmt, "[")?;
@@ -135,7 +135,7 @@ impl<L, W, T> AstDisplay<L, W> for NodeId<T>
 where
     L: NodeLibrary,
     W: fmt::Write,
-    T: AstDisplay<L, W> + Node + 'static,
+    T: AstDisplay<L, W> + Any + 'static,
 {
     fn fmt(&self, fmt: &mut AstFormatter<L, W>) -> fmt::Result {
         write!(fmt, "[{}]", self.into_u32())?;

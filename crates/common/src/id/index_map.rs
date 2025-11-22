@@ -8,21 +8,23 @@ use std::{
 
 use super::Id;
 
+/// A collection mapping one, dense index to another type.
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct IdVec<I, T> {
+pub struct IndexMap<I, T> {
     inner: Vec<T>,
     _marker: PhantomData<I>,
 }
 
-impl<I, T> Default for IdVec<I, T> {
+impl<I, T> Default for IndexMap<I, T> {
     fn default() -> Self {
-        IdVec::new()
+        IndexMap::new()
     }
 }
 
-impl<I, T> IdVec<I, T> {
+impl<I, T> IndexMap<I, T> {
     /// Create a new `IdVec`.
-    pub fn new() -> Self {
+    #[inline]
+    pub const fn new() -> Self {
         Self {
             inner: Vec::new(),
             _marker: PhantomData,
@@ -30,6 +32,7 @@ impl<I, T> IdVec<I, T> {
     }
 
     /// Create a new `IdVec`.
+    #[inline]
     pub fn with_capacity(cap: usize) -> Self {
         Self {
             inner: Vec::with_capacity(cap),
@@ -37,28 +40,33 @@ impl<I, T> IdVec<I, T> {
         }
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.inner.len()
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 
+    #[inline]
     pub fn clear(&mut self) {
         self.inner.clear();
     }
 }
 
-impl<I: Id, T> IdVec<I, T> {
+impl<I: Id, T> IndexMap<I, T> {
     /// Returns the id of the next value that would be pushed.
     /// Will return None if the size exceeded the value the index can hold.
+    #[inline]
     pub fn next_id(&self) -> Option<I> {
         I::from_idx(self.inner.len())
     }
 
     /// Add a new value to the vector returning the id.
     /// Will return None if the size exceeded the value the index can hold.
+    #[inline]
     pub fn push(&mut self, value: T) -> Option<I> {
         let idx = I::from_idx(self.inner.len())?;
         self.inner.push(value);
@@ -69,6 +77,7 @@ impl<I: Id, T> IdVec<I, T> {
     ///
     /// If the current length is less then the index of where this value should be inserted all the
     /// other values will be filled with the given callback.
+    #[inline]
     pub fn insert_fill<F>(&mut self, at: I, value: T, mut fill: F)
     where
         F: FnMut() -> T,
@@ -91,6 +100,7 @@ impl<I: Id, T> IdVec<I, T> {
         }
     }
 
+    #[inline]
     pub fn get(&self, i: I) -> Option<&T> {
         let idx = i.idx();
         if self.inner.len() <= idx {
@@ -99,6 +109,7 @@ impl<I: Id, T> IdVec<I, T> {
         Some(&self.inner[idx])
     }
 
+    #[inline]
     pub fn get_mut(&mut self, i: I) -> Option<&mut T> {
         let idx = i.idx();
         if self.inner.len() <= idx {
@@ -108,13 +119,43 @@ impl<I: Id, T> IdVec<I, T> {
     }
 }
 
-impl<I: Id, T: Default> IdVec<I, T> {
+impl<I: Id, T> IndexMap<I, Option<T>> {
+    /// Returns the entry for the given index assuming it is filled.
+    /// Meaning it is both inserted and not `None`
+    #[inline]
+    pub fn get_filled(&self, i: I) -> &T {
+        self[i].as_ref().unwrap()
+    }
+
+    /// Returns the entry for the given index assuming it is filled.
+    /// Meaning it is both inserted and not `None`
+    #[inline]
+    pub fn get_filled_mut(&mut self, i: I) -> &mut T {
+        self[i].as_mut().unwrap()
+    }
+
+    /// Returns the entry for the given index.
+    /// Returns none if either the entry is None or the index is not within the map
+    #[inline]
+    pub fn get_flat(&self, i: I) -> Option<&T> {
+        self.get(i).and_then(|x| x.as_ref())
+    }
+
+    /// Returns the entry for the given index assuming it is filled.
+    /// Returns none if either the entry is None or the index is not within the map
+    #[inline]
+    pub fn get_flat_mut(&mut self, i: I) -> Option<&mut T> {
+        self.get_mut(i).and_then(|x| x.as_mut())
+    }
+}
+
+impl<I: Id, T: Default> IndexMap<I, T> {
     pub fn insert_fill_default(&mut self, at: I, value: T) {
         self.insert_fill(at, value, Default::default);
     }
 }
 
-impl<I: Id, T> Index<I> for IdVec<I, T> {
+impl<I: Id, T> Index<I> for IndexMap<I, T> {
     type Output = T;
 
     fn index(&self, index: I) -> &Self::Output {
@@ -122,7 +163,7 @@ impl<I: Id, T> Index<I> for IdVec<I, T> {
     }
 }
 
-impl<I: Id, T> IndexMut<I> for IdVec<I, T> {
+impl<I: Id, T> IndexMut<I> for IndexMap<I, T> {
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         self.inner.index_mut(index.idx())
     }
@@ -130,7 +171,7 @@ impl<I: Id, T> IndexMut<I> for IdVec<I, T> {
 
 macro_rules! impl_range {
     ($name:ident$(<$gen:ident>)?, $($beg:ident)? [$t:tt] $($end:ident)?) => {
-        impl<I: Id,T> Index<$name $(<$gen>)? > for IdVec<I, T> {
+        impl<I: Id,T> Index<$name $(<$gen>)? > for IndexMap<I, T> {
             type Output = [T];
 
             fn index(&self, _index: $name$(<$gen>)?) -> &Self::Output {
@@ -138,7 +179,7 @@ macro_rules! impl_range {
             }
         }
 
-        impl<I : Id, T> IndexMut<$name$(<$gen>)?> for IdVec<I, T> {
+        impl<I : Id, T> IndexMut<$name$(<$gen>)?> for IndexMap<I, T> {
             fn index_mut(&mut self, _index: $name$(<$gen>)?) -> &mut Self::Output {
                 self.inner.index_mut($(_index.$beg.idx())? $t $(_index.$end.idx())?)
             }
@@ -152,15 +193,82 @@ impl_range!(RangeFull, [..]);
 impl_range!(RangeTo<I>, [..]end);
 impl_range!(RangeToInclusive<I>, [..=]end);
 
-impl<I: Id, T> Index<RangeInclusive<I>> for IdVec<I, T> {
+impl<I: Id, T> Index<RangeInclusive<I>> for IndexMap<I, T> {
     type Output = [T];
     fn index(&self, _index: RangeInclusive<I>) -> &Self::Output {
         self.inner.index(_index.start().idx()..=_index.end().idx())
     }
 }
-impl<I: Id, T> IndexMut<RangeInclusive<I>> for IdVec<I, T> {
+impl<I: Id, T> IndexMut<RangeInclusive<I>> for IndexMap<I, T> {
     fn index_mut(&mut self, _index: RangeInclusive<I>) -> &mut Self::Output {
         self.inner
             .index_mut(_index.start().idx()..=_index.end().idx())
+    }
+}
+
+/// A collection mapping one, dense index to another.
+/// This map can be build up incrementally, inserting anywhere and filling any possible inbetween
+/// indecies with empty values.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct PartialIndexMap<I, T>(IndexMap<I, Option<T>>);
+
+impl<I, T> Default for PartialIndexMap<I, T> {
+    fn default() -> Self {
+        PartialIndexMap::new()
+    }
+}
+
+impl<I, T> PartialIndexMap<I, T> {
+    /// Create a new map with a given capacity.
+    pub const fn new() -> Self {
+        PartialIndexMap(IndexMap::new())
+    }
+
+    /// Create a new map with a given capacity.
+    pub fn with_capacity(cap: usize) -> Self {
+        PartialIndexMap(IndexMap::with_capacity(cap))
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
+}
+
+impl<I: Id, T> PartialIndexMap<I, T> {
+    #[inline]
+    pub fn get(&self, i: I) -> Option<&T> {
+        self.0.get_flat(i)
+    }
+
+    #[inline]
+    pub fn get_mut(&mut self, i: I) -> Option<&mut T> {
+        self.0.get_flat_mut(i)
+    }
+
+    #[inline]
+    pub fn insert_fill(&mut self, at: I, value: T) {
+        self.0.insert_fill(at, Some(value), || None)
+    }
+}
+
+impl<I: Id, T> Index<I> for PartialIndexMap<I, T> {
+    type Output = T;
+
+    fn index(&self, index: I) -> &Self::Output {
+        self.0.get_filled(index)
+    }
+}
+
+impl<I: Id, T> IndexMut<I> for PartialIndexMap<I, T> {
+    fn index_mut(&mut self, index: I) -> &mut Self::Output {
+        self.0.get_filled_mut(index)
     }
 }

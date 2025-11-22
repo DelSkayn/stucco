@@ -1,5 +1,5 @@
 use compile::CompilationError;
-use compiler::infer::TypeError;
+use compiler::type_check::TypeError;
 use quote::quote;
 use std::path::Path;
 

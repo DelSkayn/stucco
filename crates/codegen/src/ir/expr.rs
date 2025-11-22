@@ -1,7 +1,7 @@
 use super::VariantGen;
 use crate::{NumberType, value::Value};
 use ast::NodeId;
-use compiler::infer::{PrimTy, Ty};
+use compiler::type_check::{PrimTy, Ty};
 use inkwell::{
     IntPredicate,
     llvm_sys::{LLVMCallConv, LLVMTailCallKind},
@@ -37,7 +37,7 @@ impl<'ctx> VariantGen<'ctx> {
             ast::Expr::While(_) => todo!(),
             ast::Expr::Let(l) => {
                 let expr = self.gen_expr(self.ctx.ast[l].expr);
-                let id = self.ctx.symbols.ast_to_symbol[self.ctx.ast[l].sym].unwrap();
+                let id = self.ctx.symbols.ast_to_symbol[self.ctx.ast[l].sym];
                 self.symbol_value.insert(id, expr);
                 Value::nill()
             }
@@ -65,7 +65,7 @@ impl<'ctx> VariantGen<'ctx> {
             ast::Expr::Index(_) => todo!(),
             ast::Expr::Literal(l) => self.gen_lit(l, expr),
             ast::Expr::Symbol(s) => {
-                let id = self.ctx.symbols.ast_to_symbol[s].unwrap();
+                let id = self.ctx.symbols.ast_to_symbol[s];
                 let Some(x) = self.symbol_value.get(&id).cloned() else {
                     panic!("Undefined synmbol {id:?}")
                 };

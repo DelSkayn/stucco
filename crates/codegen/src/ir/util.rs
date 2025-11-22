@@ -1,4 +1,4 @@
-use compiler::infer::{PrimTy, Ty, TyId};
+use compiler::type_check::{PrimTy, Ty, TyId};
 use inkwell::{
     AddressSpace,
     types::{BasicType as _, BasicTypeEnum, FunctionType},

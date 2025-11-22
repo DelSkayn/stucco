@@ -5,7 +5,7 @@ use std::{
 
 use hashbrown::raw::RawTable;
 
-use super::{id_vec::IdVec, Id};
+use super::{Id, index_map::IndexMap};
 
 /// A collection which will ensure that the storage only contains unique values.
 /// If two values are pushed which are equal to each-other this collection will instead return the
@@ -13,7 +13,7 @@ use super::{id_vec::IdVec, Id};
 #[derive(Default)]
 pub struct IdSet<I, V, S = RandomState> {
     map: RawTable<I>,
-    storage: IdVec<I, V>,
+    storage: IndexMap<I, V>,
     hasher: S,
 }
 
@@ -25,9 +25,22 @@ where
     pub fn new() -> Self {
         IdSet {
             map: RawTable::new(),
-            storage: IdVec::new(),
+            storage: IndexMap::new(),
             hasher: RandomState::new(),
         }
+    }
+
+    pub fn clear(&mut self) {
+        self.map.clear();
+        self.storage.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.storage.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.storage.is_empty()
     }
 }
 
@@ -58,7 +71,9 @@ where
             }
         }
     }
+}
 
+impl<I: Id, V, S> IdSet<I, V, S> {
     pub fn get(&self, index: I) -> Option<&V> {
         self.storage.get(index)
     }
@@ -66,26 +81,11 @@ where
     pub fn get_mut(&mut self, index: I) -> Option<&mut V> {
         self.storage.get_mut(index)
     }
-
-    pub fn clear(&mut self) {
-        self.map.clear();
-        self.storage.clear();
-    }
-
-    pub fn len(&self) -> usize {
-        self.storage.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.storage.is_empty()
-    }
 }
 
 impl<I, V, S> Index<I> for IdSet<I, V, S>
 where
     I: Id,
-    V: Eq + Hash,
-    S: BuildHasher,
 {
     type Output = V;
 

@@ -35,7 +35,7 @@ pub fn string_test_runner<F: Fn(&str) -> String>(path: &Path, f: F) {
     let mut tests = Vec::new();
     walk_test_dir(path, &mut tests);
 
-    let results = match std::env::var("TEST_RESULTS").as_deref() {
+    let results = match std::env::var("RESULTS").as_deref() {
         Ok("overwrite") => TestResult::Overwrite,
         Ok("accept") => TestResult::Accept,
         Err(_) | Ok(_) => TestResult::Default,

@@ -1,12 +1,12 @@
 #![allow(dead_code)]
 
 use ast::{Ast, NodeId};
-use infer::TypeError;
 use std::{error, fmt};
 use token::Span;
+use type_check::TypeError;
 
-pub mod infer;
 pub mod resolve;
+pub mod type_check;
 
 #[derive(Debug)]
 pub enum Error {
@@ -112,7 +112,6 @@ impl Error {
     }
 }
 
-pub fn compile(ast: Ast, root: NodeId<ast::Module>) -> Result<(), Error> {
-    let _symbols = resolve::resolve(root, &ast)?;
+pub fn compile(_ast: Ast, _root: NodeId<ast::Module>) -> Result<(), Error> {
     todo!()
 }

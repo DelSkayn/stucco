@@ -1,19 +1,46 @@
-use std::cell::Cell;
+use std::{cell::Cell, collections::HashMap};
 
 use ast::{
     Ast, AstSpanned, Block, Expr, Method, NodeId,
     visit::{self, Visit},
 };
 use common::iter::IterExt;
-use token::token::{Lit, LitIntSuffix};
+use token::token::{Ident, Lit, LitIntSuffix};
 
 use crate::{
-    infer::{Narrowing, PrimTy, Ty, TyId, TypeError, Types},
-    resolve::Symbols,
+    resolve::SymbolTable,
+    type_check::{Narrowing, PrimTy, Ty, TyId, TypeError, Types},
 };
 
+pub struct DeclarePass<'a> {
+    ty: &'a mut Types,
+    names: HashMap<NodeId<Ident>, TyId>,
+}
+
+impl DeclarePass {}
+
+impl Visit for DeclarePass {
+    type Error = ();
+
+    fn visit_stmt(&mut self, ast: &ast::Ast, s: NodeId<ast::Stmt>) -> Result<(), Self::Error> {
+        let s = match ast[s] {
+            ast::Stmt::Struct(s) => s,
+            ast::Stmt::Stencil(_) | ast::Stmt::Function(_) => return Ok(()),
+        };
+        self.names
+            .entry(ast[s])
+            .or_insert_with(|| self.ty.new_type_var(Narrowing::None));
+
+        Ok(())
+    }
+}
+
+pub struct ResolveNamePass<'a> {
+    ty: &'a mut Types,
+}
+
 pub struct InferUpPass<'a> {
-    symbols: &'a Symbols,
+    symbols: &'a SymbolTable,
     ty: &'a mut Types,
     function_stack: Vec<NodeId<Expr>>,
     loop_block_stack: Vec<NodeId<Block>>,
@@ -21,7 +48,7 @@ pub struct InferUpPass<'a> {
 }
 
 impl<'a> InferUpPass<'a> {
-    pub fn new(symbols: &'a Symbols, types: &'a mut Types) -> Self {
+    pub fn new(symbols: &'a SymbolTable, types: &'a mut Types) -> Self {
         let stencil_type = types
             .type_graph
             .push(Ty::Var(Narrowing::None, Cell::new(None)))
@@ -164,7 +191,7 @@ impl<'a> InferUpPass<'a> {
                 }
             }
             ast::Type::Reference(_) => todo!(),
-            ast::Type::Direct(node_id) => {
+            ast::Type::Name(node_id) => {
                 let ident = &ast[node_id];
                 if ident == "f32" {
                     return Ok(Types::F32_ID);
@@ -302,7 +329,7 @@ impl<'a> Visit for InferUpPass<'a> {
     ) -> Result<(), Self::Error> {
         for p in ast.iter_list_node(ast[m].parameters) {
             let ty = self.type_from_ast(ast, ast[p].ty)?;
-            let sym_id = self.symbols.ast_to_symbol[ast[p].sym].expect("unresolved symbol");
+            let sym_id = self.symbols.ast_to_symbol[ast[p].sym];
             self.ty.symbol_to_type.insert_fill_default(sym_id, Some(ty));
         }
 
@@ -418,9 +445,9 @@ impl<'a> Visit for InferUpPass<'a> {
             ast::Expr::Loop(n) => {
                 let block = ast[n].body;
                 let ty_id = self.ty.new_type_var(Narrowing::None);
-                self.ty.block_type.insert_fill_default(n, Some(ty_id));
-                self.loop_block_stack.push(n);
-                visit::visit_inner_block(self, ast, block)?;
+                self.ty.block_type.insert_fill_default(block, Some(ty_id));
+                self.loop_block_stack.push(block);
+                visit::visit_inner_block(self, ast, ast[block].body)?;
                 self.loop_block_stack.pop();
                 self.ty.expr_to_type.insert_fill_default(e, Some(ty_id));
             }
@@ -441,12 +468,11 @@ impl<'a> Visit for InferUpPass<'a> {
             ast::Expr::Let(n) => {
                 // TODO: Type declarations
                 let expr = ast[n].expr;
-                let symbol = self.symbols.ast_to_symbol[ast[n].sym].unwrap();
+                let symbol = self.symbols.ast_to_symbol[ast[n].sym];
                 self.visit_let(ast, n)?;
                 if let Some(x) = self.ty.symbol_to_type.get(symbol).copied().flatten() {
                     self.ty.unify(x, self.ty.expr_to_type[expr].unwrap())?;
                 } else {
-                    // TODO: Fix too unwrap here
                     self.ty
                         .symbol_to_type
                         .insert_fill_default(symbol, self.ty.expr_to_type[expr]);
@@ -508,58 +534,41 @@ impl<'a> Visit for InferUpPass<'a> {
             }
             ast::Expr::Field(_) => todo!(),
             ast::Expr::Index(_) => todo!(),
-            ast::Expr::Literal(node_id) => {
-                match ast[node_id] {
-                    Lit::Int(ref lit_int) => match lit_int.suffix() {
-                        LitIntSuffix::I64 => self
-                            .ty
-                            .expr_to_type
-                            .insert_fill_default(e, Some(Types::I64_ID)),
-                        LitIntSuffix::U64 => self
-                            .ty
-                            .expr_to_type
-                            .insert_fill_default(e, Some(Types::U64_ID)),
-                        LitIntSuffix::Usize => self
-                            .ty
-                            .expr_to_type
-                            .insert_fill_default(e, Some(Types::USIZE_ID)),
-                        LitIntSuffix::Isize => self
-                            .ty
-                            .expr_to_type
-                            .insert_fill_default(e, Some(Types::ISIZE_ID)),
-                        LitIntSuffix::None => {
-                            let ty_var = self
-                                .ty
-                                .type_graph
-                                .push(Ty::Var(Narrowing::Integer, Cell::new(None)))
-                                .unwrap();
-                            self.ty.expr_to_type.insert_fill_default(e, Some(ty_var));
-                        }
-                    },
-                    /*
-                    Lit::Float(ref lit_float) => {
-                        match lit_float.suffix() {
-                            "f64" => self
-                                .ty
-                                .expr_to_type
-                                .insert_fill_default(e, Some(Types::F64_ID)),
-                            "" => self
-                                .ty
-                                .expr_to_type
-                                .insert_fill_default(e, Some(Types::F64_ID)),
-                            // Should have been filtered out by the parser.
-                            _ => unreachable!(),
-                        }
-                    }*/
-                    Lit::Bool(_) => self
+            ast::Expr::Literal(node_id) => match ast[node_id] {
+                Lit::Int(ref lit_int) => match lit_int.suffix() {
+                    LitIntSuffix::I64 => self
                         .ty
                         .expr_to_type
-                        .insert_fill_default(e, Some(Types::BOOL_ID)),
-                    _ => todo!(),
-                }
-            }
+                        .insert_fill_default(e, Some(Types::I64_ID)),
+                    LitIntSuffix::U64 => self
+                        .ty
+                        .expr_to_type
+                        .insert_fill_default(e, Some(Types::U64_ID)),
+                    LitIntSuffix::Usize => self
+                        .ty
+                        .expr_to_type
+                        .insert_fill_default(e, Some(Types::USIZE_ID)),
+                    LitIntSuffix::Isize => self
+                        .ty
+                        .expr_to_type
+                        .insert_fill_default(e, Some(Types::ISIZE_ID)),
+                    LitIntSuffix::None => {
+                        let ty_var = self
+                            .ty
+                            .type_graph
+                            .push(Ty::Var(Narrowing::Integer, Cell::new(None)))
+                            .unwrap();
+                        self.ty.expr_to_type.insert_fill_default(e, Some(ty_var));
+                    }
+                },
+                Lit::Bool(_) => self
+                    .ty
+                    .expr_to_type
+                    .insert_fill_default(e, Some(Types::BOOL_ID)),
+                _ => todo!(),
+            },
             ast::Expr::Symbol(node_id) => {
-                let symbol = self.symbols.ast_to_symbol[node_id].unwrap();
+                let symbol = self.symbols.ast_to_symbol[node_id];
                 let ty_id = self
                     .ty
                     .symbol_to_type

@@ -1,6 +1,6 @@
 use crate::value::Value;
 use ast::{self, NodeId};
-use compiler::infer::{Ty, TyId, Types};
+use compiler::type_check::{Ty, TyId, Types};
 use llvm_sys::LLVMCallConv;
 use std::{collections::HashMap, sync::OnceLock};
 

@@ -102,7 +102,7 @@ impl Parse for ast::Become {
         let span = parser.span();
         parser.expect::<T![become]>()?;
         let callee = parser.expect()?;
-        let callee = parser.push(callee)?;
+        let callee = parser.push_set(callee)?;
         let args = parser.parse_parenthesized(|parser, _| parser.parse_terminated::<_, T![,]>())?;
         Ok(Self { callee, args, span })
     }
@@ -168,7 +168,7 @@ impl Parse for ast::Symbol {
     fn parse(parser: &mut Parser) -> Result<Self> {
         let ident: token::Ident = parser.expect()?;
         let span = ident.span().into();
-        let ident = parser.push(ident)?;
+        let ident = parser.push_set(ident)?;
         Ok(ast::Symbol { name: ident, span })
     }
 }

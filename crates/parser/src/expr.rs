@@ -2,7 +2,7 @@ use ast::{AstSpanned, BinOp, UnOp};
 use proc_macro2::Delimiter;
 
 use crate::{Parse, Parser, Result, prime::parse_prime};
-use ::token::{Spanned, T, token};
+use ::token::{T, token};
 
 impl Parse for ast::Expr {
     fn parse(parser: &mut Parser) -> Result<Self> {
@@ -192,7 +192,7 @@ fn parse_dot(parser: &mut Parser, base: ast::Expr) -> Result<ast::Expr> {
     let span = parser.expect::<T![.]>()?.0;
     if parser.peek2::<token::Paren>() {
         let ident = parser.expect()?;
-        let ident = parser.push(ident)?;
+        let ident = parser.push_set(ident)?;
         let args = parser.parse_parenthesized(|parser, _| parser.parse_terminated::<_, T![,]>())?;
         let receiver = parser.push(base)?;
         let call = parser.push(ast::Method {
@@ -204,9 +204,9 @@ fn parse_dot(parser: &mut Parser, base: ast::Expr) -> Result<ast::Expr> {
         Ok(ast::Expr::Method(call))
     } else {
         let ident = parser.expect()?;
-        let ident = parser.push(ident)?;
+        let ident = parser.push_set(ident)?;
         let base = parser.push(base)?;
-        let field = parser.push(ast::Field {
+        let field = parser.push(ast::FieldExpr {
             base,
             field: ident,
             span,

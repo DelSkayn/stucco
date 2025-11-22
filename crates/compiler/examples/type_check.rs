@@ -1,17 +1,10 @@
-use ast::{
-    Ast, AstSpanned as _,
-    visit::{self, Visit},
-};
-use common::{
-    error,
-    render::{self, IndentFormatter},
-};
-use core::fmt;
+use ast::{AstSpanned as _, visit::Visit};
+use common::render::{self, IndentFormatter};
 use parser::{Parser, parse_external_module};
-use std::{env, error::Error, fmt::Write as _, io::Read};
+use std::{env, error::Error, io::Read};
 use stucco_compiler::{
-    infer::{TypeError, Types, print::TypePrinter},
-    resolve::{Symbols, resolve},
+    resolve::{ResolveInfo, resolve},
+    type_check::{TypeError, Types, print::TypePrinter},
 };
 use token::Spanned as _;
 
@@ -32,7 +25,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
-    let symbols = match resolve(node, &ast) {
+    let mut info = ResolveInfo::new();
+    match resolve(node, &ast, &mut info) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("ERROR: {}", e.render(&src));
@@ -41,12 +35,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let mut types = Types::new();
-    match types.infer(&ast, &symbols, node) {
+    match types.infer(&ast, &info.symbols, node) {
         Ok(()) => println!(
             "{}",
             render::render(|fmt| {
                 let mut fmt = IndentFormatter::new(fmt, 2);
-                TypePrinter::new(true, &mut fmt, &src, &symbols, &types).visit_module(&ast, node)
+                TypePrinter::new(true, &mut fmt, &src, &info.symbols, &types)
+                    .visit_module(&ast, node)
             })
         ),
         Err(e) => {

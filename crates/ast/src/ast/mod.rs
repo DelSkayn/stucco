@@ -1,9 +1,6 @@
-use common::{
-    id,
-    id::{Id, IdSet},
-    thinvec::ThinVec,
-};
+use common::{id, id::Id};
 use std::{
+    any::Any,
     cmp::Eq,
     error,
     fmt::{self},
@@ -11,77 +8,34 @@ use std::{
     ops::{Index, IndexMut},
     u32,
 };
-use token::{
-    Span, Spanned,
-    token::{Ident, Lit},
-};
+use token::{Span, Spanned};
 
 #[cfg(feature = "print")]
 mod print;
+mod traits;
 #[cfg(feature = "print")]
 pub use print::{AstDisplay, AstFormatter, AstRender};
 
-pub trait NodeStorage<T: Node> {
-    fn storage_get(&self, idx: u32) -> Option<&T>;
+pub trait Node: Any {}
+pub trait UniqueNode: Any + Eq + Hash {}
 
-    fn storage_get_mut(&mut self, idx: u32) -> Option<&mut T>;
+pub trait NodeCollection<T> {
+    fn node_get(&self, idx: u32) -> Option<&T>;
 
-    fn storage_push(&mut self, value: T) -> u32;
+    fn node_get_mut(&mut self, idx: u32) -> Option<&mut T>;
 }
 
-impl<T: Node> NodeStorage<T> for Vec<T> {
-    fn storage_get(&self, idx: u32) -> Option<&T> {
-        self.get(idx as usize)
-    }
-    fn storage_get_mut(&mut self, idx: u32) -> Option<&mut T> {
-        self.get_mut(idx as usize)
-    }
-
-    fn storage_push(&mut self, value: T) -> u32 {
-        let res = self.len().try_into().expect("too many nodes");
-        self.push(value);
-        res
-    }
+pub trait NodeVec<T: Node>: NodeCollection<T> {
+    fn node_insert(&mut self, value: T) -> Option<u32>;
 }
 
-impl<T: Node> NodeStorage<T> for ThinVec<T> {
-    fn storage_get(&self, idx: u32) -> Option<&T> {
-        self.get(idx)
-    }
-    fn storage_get_mut(&mut self, idx: u32) -> Option<&mut T> {
-        self.get_mut(idx)
-    }
-
-    fn storage_push(&mut self, value: T) -> u32 {
-        let res = self.len().try_into().expect("too many nodes");
-        self.push(value);
-        res
-    }
+pub trait NodeSet<T: UniqueNode>: NodeCollection<T> {
+    fn node_insert(&mut self, value: T) -> Option<u32>;
 }
-
-impl<T: Node> NodeStorage<T> for IdSet<u32, T> {
-    fn storage_get(&self, idx: u32) -> Option<&T> {
-        self.get(idx)
-    }
-
-    fn storage_get_mut(&mut self, idx: u32) -> Option<&mut T> {
-        self.get_mut(idx)
-    }
-
-    fn storage_push(&mut self, value: T) -> u32 {
-        self.push(value).expect("too many nodes")
-    }
-}
-
-pub trait Node: Hash + Eq + 'static {}
-
-impl Node for Span {}
-impl Node for Ident {}
-impl Node for Lit {}
 
 id!(NodeId<T>);
 
-impl<T: Node> NodeId<T> {
+impl<T: Any> NodeId<T> {
     pub fn index<L>(self, ast: &Ast<L>) -> &T
     where
         L: NodeLibrary + 'static,
@@ -210,12 +164,17 @@ where
     L: NodeLibrary,
 {
     pub fn new() -> Self {
-        Self { library: L::new() }
+        Self {
+            library: L::empty(),
+        }
     }
 
     pub fn push<T: Node>(&mut self, value: T) -> Result<NodeId<T>, PushNodeError> {
-        let idx = self.library.push(value);
-        NodeId::from_u32(idx).ok_or(PushNodeError(()))
+        self.library.insert(value).ok_or(PushNodeError(()))
+    }
+
+    pub fn push_set<T: UniqueNode>(&mut self, value: T) -> Result<NodeId<T>, PushNodeError> {
+        self.library.insert_set(value).ok_or(PushNodeError(()))
     }
 
     pub fn push_list<T: Node>(
@@ -254,7 +213,7 @@ where
         }
     }
 
-    pub fn next_list<'a, T: Node>(&'a self, id: &mut Option<NodeListId<T>>) -> Option<NodeId<T>> {
+    pub fn next_list<'a, T: Any>(&'a self, id: &mut Option<NodeListId<T>>) -> Option<NodeId<T>> {
         let node = (*id)?;
 
         *id = self[node].next;
@@ -302,7 +261,7 @@ pub struct ListIterNode<'a, L, T> {
     current: Option<NodeListId<T>>,
 }
 
-impl<'a, L, T: Node> Iterator for ListIterNode<'a, L, T>
+impl<'a, L, T: Any> Iterator for ListIterNode<'a, L, T>
 where
     L: NodeLibrary,
 {
@@ -314,11 +273,11 @@ where
     }
 }
 
-impl<T: Node, L: NodeLibrary> Index<NodeId<T>> for Ast<L> {
+impl<T: Any, L: NodeLibrary> Index<NodeId<T>> for Ast<L> {
     type Output = T;
 
     fn index(&self, index: NodeId<T>) -> &Self::Output {
-        let Some(x) = self.library.get(index.into_u32()) else {
+        let Some(x) = self.library.get(index) else {
             panic!(
                 "invalid node id `{}` for type `{}`",
                 index.into_u32(),
@@ -329,16 +288,16 @@ impl<T: Node, L: NodeLibrary> Index<NodeId<T>> for Ast<L> {
     }
 }
 
-impl<T: Node, L: NodeLibrary> IndexMut<NodeId<T>> for Ast<L> {
+impl<T: Any, L: NodeLibrary> IndexMut<NodeId<T>> for Ast<L> {
     fn index_mut(&mut self, index: NodeId<T>) -> &mut Self::Output {
-        let Some(x) = self.library.get_mut(index.into_u32()) else {
+        let Some(x) = self.library.get_mut(index) else {
             panic!("invalid node id for type `{}`", std::any::type_name::<T>());
         };
         x
     }
 }
 
-impl<T: Node, L: NodeLibrary> Index<NodeListId<T>> for Ast<L> {
+impl<T: Any, L: NodeLibrary> Index<NodeListId<T>> for Ast<L> {
     type Output = NodeList<T>;
 
     fn index(&self, index: NodeListId<T>) -> &Self::Output {
@@ -346,20 +305,22 @@ impl<T: Node, L: NodeLibrary> Index<NodeListId<T>> for Ast<L> {
     }
 }
 
-impl<T: Node, L: NodeLibrary> IndexMut<NodeListId<T>> for Ast<L> {
+impl<T: Any, L: NodeLibrary> IndexMut<NodeListId<T>> for Ast<L> {
     fn index_mut(&mut self, index: NodeListId<T>) -> &mut Self::Output {
         &mut self[index.id]
     }
 }
 
 pub trait NodeLibrary {
-    fn new() -> Self;
+    fn empty() -> Self;
 
-    fn get<T: Node>(&self, idx: u32) -> Option<&T>;
+    fn get<T: Any>(&self, idx: NodeId<T>) -> Option<&T>;
 
-    fn get_mut<T: Node>(&mut self, idx: u32) -> Option<&mut T>;
+    fn get_mut<T: Any>(&mut self, idx: NodeId<T>) -> Option<&mut T>;
 
-    fn push<T: Node>(&mut self, value: T) -> u32;
+    fn insert<T: Node>(&mut self, value: T) -> Option<NodeId<T>>;
+
+    fn insert_set<T: UniqueNode>(&mut self, value: T) -> Option<NodeId<T>>;
 
     fn clear(&mut self);
 }
@@ -379,7 +340,7 @@ where
 
 impl<T> AstSpanned for NodeId<T>
 where
-    T: AstSpanned + Node,
+    T: AstSpanned + Any,
 {
     fn ast_span<L: NodeLibrary>(&self, ast: &Ast<L>) -> Span {
         ast[*self].ast_span(ast)
@@ -390,30 +351,36 @@ where
 macro_rules! library {
     (
         $(#[$m:meta])*
-        $name:ident{ $($field:ident: $container:ident<$( $ty:ty ),* $(,)?>),* $(,)? }
+        $name:ident {
+			$(
+				$(#[$field_meta:ident])*
+				$field:ident: $container:ident<$ty:ty>
+			),*
+			$(,)?
+		}
     ) => {
 
         $(#[$m])*
         pub struct $name{
             $(
-                pub $field: $container<$( $ty ),*>
+                pub $field: $container<$ty>
             ),*
         }
 
         impl $crate::ast::NodeLibrary for $name{
-            fn new() -> Self{
+            fn empty() -> Self{
                 $name{
                     $($field: $container::new()),*
                 }
             }
 
-            fn get<T: Node>(&self, idx: u32) -> Option<&T>{
+			fn get<T: ::std::any::Any>(&self, id: NodeId<T>) -> Option<&T>{
                 let type_id = std::any::TypeId::of::<T>();
                 $(
-                    if std::any::TypeId::of::<library!(@last $($ty,)*)>() == type_id{
+                    if std::any::TypeId::of::<$ty>() == type_id{
                         unsafe{
-                            let cntr = std::mem::transmute::<&$container<$($ty,)*>,&$container<T>>(&self.$field);
-                            return $crate::ast::NodeStorage::storage_get(cntr,idx);
+                            let cntr = std::mem::transmute::<&$container<$ty>,&$container<T>>(&self.$field);
+                            return $crate::ast::NodeCollection::<T>::node_get(cntr,id.into_u32());
                         }
                     }
 
@@ -422,28 +389,31 @@ macro_rules! library {
                 panic!("type '{}' not part of node library",std::any::type_name::<T>());
             }
 
-            fn get_mut<T: Node>(&mut self, idx: u32) -> Option<&mut T>{
+            fn get_mut<T: ::std::any::Any>(&mut self, idx: NodeId<T>) -> Option<&mut T>{
                 let type_id = std::any::TypeId::of::<T>();
                 $(
-                    if std::any::TypeId::of::<library!(@last $($ty,)*)>() == type_id{
+                    if std::any::TypeId::of::<$ty>() == type_id{
                         unsafe{
-                            let cntr = std::mem::transmute::<&mut $container<$($ty,)*>,&mut $container<T>>(&mut self.$field);
-                            return $crate::ast::NodeStorage::storage_get_mut(cntr,idx);
+                            let cntr = std::mem::transmute::<&mut $container<$ty>,&mut $container<T>>(&mut self.$field);
+                            return $crate::ast::NodeCollection::<T>::node_get_mut(cntr,idx.into_u32());
                         }
                     }
                 )*
                 panic!("type '{}' not part of node library",std::any::type_name::<T>());
             }
 
-            fn push<T: Node>(&mut self, value: T) -> u32{
+            fn insert<T: crate::ast::Node>(&mut self, value: T) -> Option<NodeId<T>>{
                 let type_id = std::any::TypeId::of::<T>();
                 $(
-                    if std::any::TypeId::of::<library!(@last $($ty,)*)>() == type_id{
-                        unsafe{
-                            let cntr = std::mem::transmute::<&mut $container<$($ty,)*>,&mut $container<T>>(&mut self.$field);
-                            return $crate::ast::NodeStorage::storage_push(cntr,value);
-                        }
-                    }
+					library!{@push $($field_meta)?, $ty, $container,self.$field = type_id <= value}
+                )*
+                panic!("type '{}' not part of node library",std::any::type_name::<T>());
+            }
+
+            fn insert_set<T: crate::ast::UniqueNode>(&mut self, value: T) -> Option<NodeId<T>>{
+                let type_id = std::any::TypeId::of::<T>();
+                $(
+					library!{@push_set $($field_meta)?, $ty, $container,self.$field = type_id <= value}
                 )*
                 panic!("type '{}' not part of node library",std::any::type_name::<T>());
             }
@@ -458,12 +428,31 @@ macro_rules! library {
 
     };
 
-    (@last $f:ty, $($t:ty,)+) => {
-        library!(@last $($t,)*)
-    };
-    (@last $f:ty,) => {
-        $f
-    };
+	(@push , $ty:ty, $container:ident, $this:ident.$field:ident = $ty_id:ident <= $value:ident) => {
+		if std::any::TypeId::of::<$ty>() == $ty_id{
+			unsafe{
+				let cntr = std::mem::transmute::<&mut $container<$ty>,&mut $container<T>>(&mut $this.$field);
+				let idx = <$container<T> as $crate::ast::NodeVec::<T>>::node_insert(cntr,$value)?;
+				return NodeId::<T>::from_u32(idx)
+			}
+		}
+	};
+
+	(@push set, $ty:ty, $container:ident, $this:ident.$field:ident = $ty_id:ident <= $value:ident) => {
+	};
+
+	(@push_set, $ty:ty, $container:ident, $this:ident.$field:ident = $ty_id:ident <= $value:ident) => {
+	};
+
+	(@push_set set, $ty:ty, $container:ident, $this:ident.$field:ident = $ty_id:ident <= $value:ident) => {
+		if std::any::TypeId::of::<$ty>() == $ty_id{
+			unsafe{
+				let cntr = std::mem::transmute::<&mut $container<$ty>,&mut $container<T>>(&mut $this.$field);
+				let idx = <$container<T> as $crate::ast::NodeSet::<T>>::node_insert(cntr,$value)?;
+				return NodeId::<T>::from_u32(idx)
+			}
+		}
+	};
 }
 
 #[macro_export]

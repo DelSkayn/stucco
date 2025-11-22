@@ -4,7 +4,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use compiler::infer::TypeError;
+use compiler::type_check::TypeError;
 use proc_macro2::{Ident, Span};
 use stucco_expand::compile::CompilationError;
 

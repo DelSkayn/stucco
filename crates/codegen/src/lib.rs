@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::Infallible};
 
-use ast::{Ast, NodeId};
+use ast::{Ast, NodeId, visit::Visit};
 use compiler::{
-    infer::{PrimTy, Ty, Types},
-    resolve::Symbols,
+    resolve::SymbolTable,
+    type_check::{PrimTy, Ty, Types},
 };
 use inkwell::context::Context;
 use ir::{VariantGen, VariantModule};
@@ -43,7 +43,7 @@ impl Default for Config {
 pub struct CodeGen {
     context: Context,
     pub ast: Ast,
-    pub symbols: Symbols,
+    pub symbols: SymbolTable,
     pub types: Types,
     pub config: Config,
 }
@@ -72,8 +72,31 @@ impl NumberType {
     }
 }
 
+struct StencilVisitor<F>(F);
+
+impl<F: FnMut(NodeId<ast::Stencil>)> Visit for StencilVisitor<F> {
+    type Error = Infallible;
+
+    fn visit_function(
+        &mut self,
+        _: &ast::Ast,
+        _: NodeId<ast::Function>,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn visit_struct(&mut self, _: &ast::Ast, _: NodeId<ast::Struct>) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn visit_stencil(&mut self, _: &ast::Ast, m: NodeId<ast::Stencil>) -> Result<(), Self::Error> {
+        (self.0)(m);
+        Ok(())
+    }
+}
+
 impl CodeGen {
-    pub fn new(ast: Ast, symbols: Symbols, types: Types, config: Config) -> Self {
+    pub fn new(ast: Ast, symbols: SymbolTable, types: Types, config: Config) -> Self {
         let context = Context::create();
         CodeGen {
             context,
@@ -98,7 +121,8 @@ impl CodeGen {
             entry,
             stencils: HashMap::new(),
         };
-        for s in self.ast.iter_list_node(self.ast[root].stencils) {
+
+        let _ = StencilVisitor(|s| {
             let mut stencil = obj::Stencil {
                 variants: Vec::new(),
             };
@@ -120,7 +144,8 @@ impl CodeGen {
                     .to_string(),
                 stencil,
             );
-        }
+        })
+        .visit_module(&self.ast, root);
 
         set
     }

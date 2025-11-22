@@ -1,3 +1,5 @@
+use std::process::id;
+
 use crate::{Parse, Parser, Result};
 use ::token::{T, token};
 
@@ -28,9 +30,7 @@ impl Parse for ast::Type {
             return Ok(v);
         }
 
-        let name = parser.expect()?;
-        let name = parser.push(name)?;
-        Ok(ast::Type::Direct(name))
+        Ok(ast::Type::Name(parser.parse_push()?))
     }
 }
 
@@ -101,5 +101,51 @@ impl Parse for ast::TypeTuple {
         let fields =
             parser.parse_parenthesized(|parser, _| parser.parse_terminated::<_, T![,]>())?;
         Ok(ast::TypeTuple { fields, span })
+    }
+}
+
+impl Parse for ast::TypeName {
+    fn parse(parser: &mut Parser) -> Result<Self> {
+        let ident = parser.expect::<token::Ident>()?;
+        let span = ident.span().into();
+        let name = parser.push_set(ident)?;
+        Ok(ast::TypeName { span, name })
+    }
+}
+
+impl Parse for ast::Struct {
+    fn parse(parser: &mut Parser) -> Result<Self> {
+        let start = parser.span();
+        let public = parser.eat::<T![pub]>().is_some();
+
+        parser.expect::<T![struct]>()?;
+
+        let name = parser.expect()?;
+        let name = parser.push_set(name)?;
+
+        let fields =
+            parser.parse_braced(|parser, _| parser.parse_terminated::<ast::Field, T![,]>())?;
+
+        let span = parser.span_since(start);
+
+        Ok(ast::Struct {
+            public,
+            name,
+            fields,
+            span,
+        })
+    }
+}
+
+impl Parse for ast::Field {
+    fn parse(parser: &mut Parser) -> Result<Self> {
+        let start = parser.span();
+        let name = parser.expect()?;
+        let name = parser.push_set(name)?;
+        parser.expect::<T![:]>()?;
+
+        let ty = parser.parse_push()?;
+        let span = start.try_join(parser.last_span());
+        Ok(ast::Field { name, ty, span })
     }
 }

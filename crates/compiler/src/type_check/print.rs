@@ -6,13 +6,13 @@ use ast::{
 };
 use common::{error, render::IndentFormatter};
 
-use crate::{infer::Types, resolve::Symbols};
+use crate::{type_check::Types, resolve::SymbolTable};
 
 pub struct TypePrinter<'a, W> {
     terminal: bool,
     source: &'a str,
     fmt: &'a mut IndentFormatter<W>,
-    symbols: &'a Symbols,
+    symbols: &'a SymbolTable,
     types: &'a Types,
 }
 
@@ -24,7 +24,7 @@ where
         terminal: bool,
         fmt: &'a mut IndentFormatter<W>,
         source: &'a str,
-        symbols: &'a Symbols,
+        symbols: &'a SymbolTable,
         types: &'a Types,
     ) -> Self {
         TypePrinter {
@@ -107,7 +107,7 @@ where
         let byte_range = e.ast_span(ast).byte_range();
         let line = error::render_line(self.source, byte_range, self.terminal);
         write!(self.fmt, "'{}'", line.trim())?;
-        let symbol = self.symbols.ast_to_symbol[e].unwrap();
+        let symbol = self.symbols.ast_to_symbol[e];
         if let Some(x) = self.types.symbol_to_type.get(symbol).copied().flatten() {
             let ty = self.types.find_type(x);
             writeln!(self.fmt, " = {:?}", &self.types.type_to_string(ty))?;

@@ -118,8 +118,12 @@ impl<'a> TokenSlice<'a> {
         }
     }
 
-    pub fn format_cur(&self) -> FormatToken<'a> {
-        FormatToken(self.cur())
+    pub fn format_cur<'b>(&'b self) -> FormatToken<'b> {
+        if self.is_empty() {
+            FormatToken(None, PhantomData)
+        } else {
+            FormatToken(Some(self.cur.get()), PhantomData)
+        }
     }
 
     pub fn advance(&self) {
@@ -240,13 +244,29 @@ impl<'a> TokenSlice<'a> {
     }
 }
 
-pub struct FormatToken<'a>(Option<&'a TokenType>);
+pub struct FormatToken<'a>(Option<NonNull<TokenType>>, PhantomData<&'a TokenSlice<'a>>);
 impl fmt::Display for FormatToken<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(x) = self.0 {
-            write!(f, "{x}")
-        } else {
-            write!(f, "eof")
+        let Some(x) = self.0 else {
+            return write!(f, "eof");
+        };
+
+        match unsafe { x.as_ref() } {
+            TokenType::Ident(x) => x.fmt(f),
+            TokenType::Literal(x) => x.fmt(f),
+            TokenType::Punct(x) => x.fmt(f),
+            TokenType::Group(x, _) => x.fmt(f),
+            TokenType::Back(offset) => unsafe {
+                let TokenType::Group(g, _) = x.sub(offset + 1).as_ref() else {
+                    unreachable!()
+                };
+                match g.delimiter() {
+                    Delimiter::Parenthesis => write!(f, "("),
+                    Delimiter::Brace => write!(f, "}}"),
+                    Delimiter::Bracket => write!(f, "]"),
+                    Delimiter::None => write!(f, "error"),
+                }
+            },
         }
     }
 }

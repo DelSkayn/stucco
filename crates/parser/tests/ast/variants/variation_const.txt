@@ -1,0 +1,53 @@
+stencil foo(a: i64)
+    variant v:
+        const a = 1,
+{
+    return 1 + a
+}
+----------
+[0]Module {
+  sym: Some,
+  stmts: Some([
+    [0]Stmt::Stencil([0]Stencil {
+      sym: [0]Symbol {
+        name: [0]Ident{ sym: foo, span: 8..11 },
+      },
+      parameters: Some([
+        [0]Parameter {
+          sym: [1]Symbol {
+            name: [1]Ident{ sym: a, span: 12..13 },
+          },
+          ty: [0]Type::Direct([2]Ident{ sym: i64, span: 15..18 }),
+        },
+      ]),
+      variants: Some([
+        [0]Variant {
+          name: [3]Ident{ sym: v, span: 32..33 },
+          variations: Some([
+            [0]Variation::Const([0]VariationConst {
+              sym: [2]Symbol {
+                name: [1]Ident{ sym: a, span: 12..13 },
+              },
+              expr: [0]Expr::Literal([0]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(53..54) })),
+            }),
+          ]),
+        },
+      ]),
+      output: Some,
+      body: [5]Expr::Block([0]Block {
+        body: Some([
+          [4]Expr::Return([0]Return {
+            expr: Some([3]Expr::Binary([0]BinaryExpr {
+              left: [2]Expr::Literal([1]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(69..70) })),
+              op: Add,
+              right: [1]Expr::Symbol([3]Symbol {
+                name: [1]Ident{ sym: a, span: 12..13 },
+              }),
+            })),
+          }),
+        ]),
+        returns_last: true,
+      }),
+    }),
+  ]),
+}

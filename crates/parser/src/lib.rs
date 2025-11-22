@@ -15,6 +15,7 @@ pub mod error;
 mod expr;
 mod prime;
 mod stencil;
+mod stmt;
 mod ty;
 mod util;
 mod variant;
@@ -101,6 +102,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         self.slice.is_empty()
     }
 
+    /// Returns the span for the next token.
     pub fn span(&self) -> Span {
         self.slice.span().into()
     }
@@ -247,12 +249,16 @@ impl<'a, 'b> Parser<'a, 'b> {
         if let Some(t) = T::lex(&self.slice) {
             Ok(t)
         } else {
-            Err(self.error(format_args!(
-                "Unexpected token '{}' expected '{}'",
-                self.slice.format_cur(),
-                T::NAME
-            )))
+            Err(self.unexpected(T::NAME))
         }
+    }
+
+    pub fn unexpected(&self, expected: &str) -> Error {
+        self.error(format_args!(
+            "Unexpected token '{}' expected '{}'",
+            self.slice.format_cur(),
+            expected
+        ))
     }
 
     pub fn last_span(&self) -> Span {
@@ -301,7 +307,7 @@ pub fn parse_wrapped_module(parser: &mut Parser) -> Result<NodeId<ast::Module>> 
 
     parser.push(ast::Module {
         sym: Some(sym),
-        stencils: functions,
+        stmts: functions,
         span,
     })
 }
@@ -330,7 +336,7 @@ pub fn parse_external_module(parser: &mut Parser) -> Result<NodeId<ast::Module>>
 
     parser.push(ast::Module {
         sym: None,
-        stencils: head,
+        stmts: head,
         span,
     })
 }

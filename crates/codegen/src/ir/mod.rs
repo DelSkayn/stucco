@@ -1,4 +1,4 @@
-//! Implemention the llvm IR generation.
+//! Implemention of the llvm IR generation.
 
 use std::{collections::HashMap, fmt::Write as _};
 
@@ -13,7 +13,7 @@ use inkwell::{
     types::{AnyType as _, BasicType as _},
     values::{AnyValue, FunctionValue},
 };
-use llvm_sys::{LLVMCallConv, LLVMTailCallKind};
+use llvm_sys::LLVMCallConv;
 
 use crate::{CodeGen, Target, value::Value, wrapper::GlobalValueExt as _};
 
@@ -219,6 +219,7 @@ impl<'ctx> VariantGen<'ctx> {
             match self.ctx.ast[p] {
                 Variation::Immediate(node_id) => imms.push(node_id),
                 Variation::Slot(node_id) => slots.push(node_id),
+                Variation::Const(_) => todo!(),
             }
         }
 
@@ -229,11 +230,11 @@ impl<'ctx> VariantGen<'ctx> {
             .ast
             .iter_list_node(self.ctx.ast[stencil].parameters)
         {
-            let param_sym = self.ctx.symbols.ast_to_symbol[self.ctx.ast[param].sym].unwrap();
+            let param_sym = self.ctx.symbols.ast_to_symbol[self.ctx.ast[param].sym];
             if !slots
                 .iter()
                 .copied()
-                .any(|x| self.ctx.symbols.ast_to_symbol[self.ctx.ast[x].sym].unwrap() == param_sym)
+                .any(|x| self.ctx.symbols.ast_to_symbol[self.ctx.ast[x].sym] == param_sym)
             {
                 continue;
             }
@@ -250,7 +251,7 @@ impl<'ctx> VariantGen<'ctx> {
 
         // Generate immediate values.
         for imm in imms {
-            let symbol = self.ctx.symbols.ast_to_symbol[self.ctx.ast[imm].sym].unwrap();
+            let symbol = self.ctx.symbols.ast_to_symbol[self.ctx.ast[imm].sym];
             // Global, the address of which will be the right value.
             let global = self.module.add_global(
                 self.ctx.context.i8_type(),
@@ -340,29 +341,29 @@ impl<'ctx> VariantGen<'ctx> {
 
             let ty = self.ctx.types.find_type_symbol(symbol).unwrap();
             let v = match self.ctx.types.type_graph[ty] {
-                compiler::infer::Ty::Prim(p) => match p {
-                    compiler::infer::PrimTy::Nil => todo!(),
-                    compiler::infer::PrimTy::Bool => todo!(),
-                    compiler::infer::PrimTy::Usize
-                    | compiler::infer::PrimTy::Isize
-                    | compiler::infer::PrimTy::U64
-                    | compiler::infer::PrimTy::I64 => v.as_any_value_enum(),
-                    compiler::infer::PrimTy::U32 => todo!(),
-                    compiler::infer::PrimTy::I32 => todo!(),
-                    compiler::infer::PrimTy::U16 => todo!(),
-                    compiler::infer::PrimTy::I16 => todo!(),
-                    compiler::infer::PrimTy::U8 => todo!(),
-                    compiler::infer::PrimTy::I8 => todo!(),
-                    compiler::infer::PrimTy::F32 => todo!(),
-                    compiler::infer::PrimTy::F64 => todo!(),
-                    compiler::infer::PrimTy::Diverges => todo!(),
+                compiler::type_check::Ty::Prim(p) => match p {
+                    compiler::type_check::PrimTy::Nil => todo!(),
+                    compiler::type_check::PrimTy::Bool => todo!(),
+                    compiler::type_check::PrimTy::Usize
+                    | compiler::type_check::PrimTy::Isize
+                    | compiler::type_check::PrimTy::U64
+                    | compiler::type_check::PrimTy::I64 => v.as_any_value_enum(),
+                    compiler::type_check::PrimTy::U32 => todo!(),
+                    compiler::type_check::PrimTy::I32 => todo!(),
+                    compiler::type_check::PrimTy::U16 => todo!(),
+                    compiler::type_check::PrimTy::I16 => todo!(),
+                    compiler::type_check::PrimTy::U8 => todo!(),
+                    compiler::type_check::PrimTy::I8 => todo!(),
+                    compiler::type_check::PrimTy::F32 => todo!(),
+                    compiler::type_check::PrimTy::F64 => todo!(),
+                    compiler::type_check::PrimTy::Diverges => todo!(),
                 },
-                compiler::infer::Ty::Ref(_) => todo!(),
-                compiler::infer::Ty::RefMut(_) => todo!(),
-                compiler::infer::Ty::Tuple(_) => todo!(),
-                compiler::infer::Ty::Ptr(_)
-                | compiler::infer::Ty::PtrMut(_)
-                | compiler::infer::Ty::Fn(..) => self
+                compiler::type_check::Ty::Ref(_) => todo!(),
+                compiler::type_check::Ty::RefMut(_) => todo!(),
+                compiler::type_check::Ty::Tuple(_) => todo!(),
+                compiler::type_check::Ty::Ptr(_)
+                | compiler::type_check::Ty::PtrMut(_)
+                | compiler::type_check::Ty::Fn(..) => self
                     .builder
                     .build_int_to_ptr(
                         v,
@@ -371,8 +372,8 @@ impl<'ctx> VariantGen<'ctx> {
                     )
                     .unwrap()
                     .as_any_value_enum(),
-                compiler::infer::Ty::Array(ty_id, _) => todo!(),
-                compiler::infer::Ty::Var(..) => unreachable!(),
+                compiler::type_check::Ty::Array(_, _) => todo!(),
+                compiler::type_check::Ty::Var(..) => unreachable!(),
             };
 
             self.symbol_value.insert(symbol, Value::from(v));

@@ -1,6 +1,6 @@
 use compiler::{
-    infer::{TypeError, Types},
-    resolve::resolve,
+    resolve::{ResolveInfo, resolve},
+    type_check::{TypeError, Types},
 };
 use parser::{Parser, parse_external_module};
 use std::{env, error::Error, path::Path};
@@ -20,8 +20,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
-    let symbols = match resolve(node, &ast) {
-        Ok(s) => s,
+    let mut info = ResolveInfo::new();
+    match resolve(node, &ast, &mut info) {
+        Ok(_) => {}
         Err(e) => {
             eprintln!("ERROR: {}", e.render(&src));
             return Ok(());
@@ -29,7 +30,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let mut types = Types::new();
-    match types.infer(&ast, &symbols, node) {
+    match types.infer(&ast, &info.symbols, node) {
         Ok(()) => {}
         Err(e) => {
             match e {
@@ -46,7 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let code_gen = CodeGen::new(ast, symbols, types, Default::default());
+    let code_gen = CodeGen::new(ast, info.symbols, types, Default::default());
 
     let path = format!("{arg}_obj");
     let path = Path::new(&path);
@@ -61,7 +62,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let obj = code_gen.generate_entry().into_object(Target::X86_64);
     std::fs::write(path.join(format!("__entry__.o")), &obj)?;
 
-    for stencil in code_gen.ast.iter_list_node(code_gen.ast[node].stencils) {
+    for stencil in code_gen.ast.iter_list_node(code_gen.ast[node].stmts) {
         for var in code_gen.ast.iter_list_node(code_gen.ast[stencil].variants) {
             let obj = code_gen
                 .generate_variant(stencil, var)
@@ -99,6 +100,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         );
                         name.push_str("_slot");
                     }
+                    ast::Variation::Const(_) => todo!(),
                 }
             }
 

@@ -4,7 +4,7 @@ pub mod visit;
 pub use ast::Node;
 use ast::NodeLibrary;
 pub use ast::{AstSpanned, NodeId, NodeList, NodeListId, PushNodeError};
-use common::id::IdSet;
+use common::{id::IdSet, u32_vec::U32Vec};
 use token::{
     Span,
     token::{Ident, Lit},
@@ -16,66 +16,78 @@ pub use ast::{AstDisplay, AstFormatter, AstRender};
 type LibrarySet<T> = IdSet<u32, T>;
 
 library!(Library {
-    module: Vec<Module>,
+    module: U32Vec<Module>,
 
-    stencil_function: Vec<Stencil>,
-    stencil_functions: Vec<NodeList<Stencil>>,
+    stmt: U32Vec<Stmt>,
+    stmts: U32Vec<NodeList<Stmt>>,
 
-    variant: Vec<Variant>,
-    variants: Vec<NodeList<Variant>>,
+    r#struct: U32Vec<Struct>,
+    field: U32Vec<Field>,
+    fields: U32Vec<NodeList<Field>>,
 
-    variation: Vec<Variation>,
-    variations: Vec<NodeList<Variation>>,
+    function: U32Vec<Function>,
 
-    variation_slot: Vec<VariationSlot>,
-    variation_constant: Vec<VariationImmediate>,
+    stencil_function: U32Vec<Stencil>,
+    stencil_functions: U32Vec<NodeList<Stencil>>,
 
-    parameter: Vec<Parameter>,
-    parameters: Vec<NodeList<Parameter>>,
+    variant: U32Vec<Variant>,
+    variants: U32Vec<NodeList<Variant>>,
 
-    expr: Vec<Expr>,
-    exprs: Vec<NodeList<Expr>>,
-    binary: Vec<BinaryExpr>,
-    unary: Vec<UnaryExpr>,
-    if_: Vec<If>,
-    while_: Vec<While>,
-    loop_: Vec<Loop>,
-    block: Vec<Block>,
+    variation: U32Vec<Variation>,
+    variations: U32Vec<NodeList<Variation>>,
 
-    literal: Vec<Lit>,
+    variation_slot: U32Vec<VariationSlot>,
+    variation_imm: U32Vec<VariationImmediate>,
+    variation_const: U32Vec<VariationConst>,
 
-    let_: Vec<Let>,
+    parameter: U32Vec<Parameter>,
+    parameters: U32Vec<NodeList<Parameter>>,
 
-    method: Vec<Method>,
-    call: Vec<Call>,
-    field: Vec<Field>,
-    index: Vec<Index>,
-    cast: Vec<Cast>,
+    expr: U32Vec<Expr>,
+    exprs: U32Vec<NodeList<Expr>>,
+    binary: U32Vec<BinaryExpr>,
+    unary: U32Vec<UnaryExpr>,
+    if_: U32Vec<If>,
+    while_: U32Vec<While>,
+    loop_: U32Vec<Loop>,
+    block: U32Vec<Block>,
 
-    break_: Vec<Break>,
-    return_: Vec<Return>,
-    tail: Vec<Become>,
+    literal: U32Vec<Lit>,
 
-    type_: Vec<Type>,
-    types: Vec<NodeList<Type>>,
-    type_fn: Vec<TypeFn>,
-    type_array: Vec<TypeArray>,
-    type_tuple: Vec<TypeTuple>,
-    type_ptr: Vec<TypePtr>,
-    type_reference: Vec<TypeReference>,
+    let_: U32Vec<Let>,
 
-    arg: Vec<Arg>,
-    args: Vec<NodeList<Arg>>,
+    method: U32Vec<Method>,
+    call: U32Vec<Call>,
+    field_expr: U32Vec<FieldExpr>,
+    index: U32Vec<Index>,
+    cast: U32Vec<Cast>,
 
-    symbol: Vec<Symbol>,
+    break_: U32Vec<Break>,
+    return_: U32Vec<Return>,
+    tail: U32Vec<Become>,
 
+    type_: U32Vec<Type>,
+    types: U32Vec<NodeList<Type>>,
+    type_fn: U32Vec<TypeFn>,
+    type_array: U32Vec<TypeArray>,
+    type_tuple: U32Vec<TypeTuple>,
+    type_ptr: U32Vec<TypePtr>,
+    type_reference: U32Vec<TypeReference>,
+
+    arg: U32Vec<Arg>,
+    args: U32Vec<NodeList<Arg>>,
+
+    symbol: U32Vec<Symbol>,
+    type_name: U32Vec<TypeName>,
+
+    #[set]
     ident: LibrarySet<Ident>,
 });
 
 pub type Ast = ast::Ast<Library>;
 
 ast_enum! {
-        pub enum Expr {
+    pub enum Expr {
         If(NodeId<If>),
         Binary(NodeId<BinaryExpr>),
         Unary(NodeId<UnaryExpr>),
@@ -90,7 +102,7 @@ ast_enum! {
         Become(NodeId<Become>),
         Call(NodeId<Call>),
         Method(NodeId<Method>),
-        Field(NodeId<Field>),
+        Field(NodeId<FieldExpr>),
         Index(NodeId<Index>),
         Literal(NodeId<Lit>),
         Symbol(NodeId<Symbol>),
@@ -190,40 +202,40 @@ where
 }
 
 ast_struct! {
-        pub struct UnaryExpr {
+    pub struct UnaryExpr {
         pub op: UnOp,
         pub expr: NodeId<Expr>,
     }
 }
 
 ast_struct! {
-        pub struct Cast {
+    pub struct Cast {
         pub expr: NodeId<Expr>,
         pub ty: NodeId<Type>,
     }
 }
 
 ast_struct! {
-        pub struct Break {
+    pub struct Break {
         pub expr: Option<NodeId<Expr>>,
     }
 }
 
 ast_struct! {
-        pub struct Return {
+    pub struct Return {
         pub expr: Option<NodeId<Expr>>,
     }
 }
 
 ast_struct! {
-        pub struct Become{
+    pub struct Become{
         pub callee: NodeId<Ident>,
         pub args: Option<NodeListId<Expr>>,
     }
 }
 
 ast_struct! {
-        pub struct Let {
+    pub struct Let {
         pub sym: NodeId<Symbol>,
         pub mutable: bool,
         pub ty: Option<NodeId<Type>>,
@@ -232,21 +244,21 @@ ast_struct! {
 }
 
 ast_struct! {
-        pub struct Call {
+    pub struct Call {
         pub func: NodeId<Expr>,
         pub args: Option<NodeListId<Expr>>,
     }
 }
 
 ast_struct! {
-        pub struct Field {
+    pub struct FieldExpr {
         pub base: NodeId<Expr>,
         pub field: NodeId<Ident>,
     }
 }
 
 ast_struct! {
-        pub struct Index {
+    pub struct Index {
         pub base: NodeId<Expr>,
         pub index: NodeId<Expr>,
     }
@@ -267,47 +279,54 @@ ast_enum! {
         Tuple(NodeId<TypeTuple>),
         Ptr(NodeId<TypePtr>),
         Reference(NodeId<TypeReference>),
-        Direct(NodeId<Ident>),
+        Name(NodeId<TypeName>),
     }
 }
 
 ast_struct! {
-        pub struct TypeArray {
+    pub struct TypeArray {
         pub elem: NodeId<Type>,
         pub len: NodeId<Expr>,
     }
 }
 
 ast_struct! {
-        pub struct TypeFn {
+    pub struct TypeFn {
         pub params: Option<NodeListId<Type>>,
         pub output: Option<NodeId<Type>>,
     }
 }
 
 ast_struct! {
-        pub struct Arg {
+    pub struct Arg {
         pub sym: NodeId<Symbol>,
         pub ty: NodeId<Type>,
     }
 }
 
 ast_struct! {
-        pub struct TypeTuple {
+    pub struct TypeTuple {
         pub fields: Option<NodeListId<Type>>,
     }
 }
 
 ast_struct! {
-        pub struct TypePtr {
+    pub struct TypePtr {
         pub mutable: bool,
         pub ty: NodeId<Type>,
     }
 }
 
 ast_struct! {
-        pub struct TypeReference {
+    pub struct TypeReference {
         pub mutable: bool,
+        pub ty: NodeId<Type>,
+    }
+}
+
+ast_struct! {
+    pub struct Field{
+        pub name: NodeId<Ident>,
         pub ty: NodeId<Type>,
     }
 }
@@ -316,12 +335,38 @@ ast_struct! {
     pub struct Module {
         // Can be None when the module is reference externally.
         pub sym: Option<NodeId<Symbol>>,
-        pub stencils: Option<NodeListId<Stencil>>,
+        pub stmts: Option<NodeListId<Stmt>>,
+    }
+}
+
+ast_enum! {
+    pub enum Stmt{
+        Stencil(NodeId<Stencil>),
+        Struct(NodeId<Struct>),
+        Function(NodeId<Function>),
     }
 }
 
 ast_struct! {
-        pub struct Stencil {
+    pub struct Struct{
+        pub public: bool,
+        pub name: NodeId<Ident>,
+        pub fields: Option<NodeListId<Field>>,
+    }
+}
+
+ast_struct! {
+    pub struct Function{
+        pub sym: NodeId<Symbol>,
+        pub parameters: Option<NodeListId<Parameter>>,
+        pub output: Option<NodeId<Type>>,
+        /// Guaranteed to be Expr::Block
+        pub body: NodeId<Expr>
+    }
+}
+
+ast_struct! {
+    pub struct Stencil {
         pub sym: NodeId<Symbol>,
         pub parameters: Option<NodeListId<Parameter>>,
         pub variants: Option<NodeListId<Variant>>,
@@ -342,6 +387,7 @@ ast_enum! {
     pub enum Variation {
         Immediate(NodeId<VariationImmediate>),
         Slot(NodeId<VariationSlot>),
+        Const(NodeId<VariationConst>)
     }
 }
 
@@ -358,10 +404,9 @@ ast_struct! {
 }
 
 ast_struct! {
-    pub struct Function {
+    pub struct VariationConst{
         pub sym: NodeId<Symbol>,
-        pub parameters: Option<NodeListId<Parameter>>,
-        pub body: Option<NodeListId<Expr>>,
+        pub expr: NodeId<Expr>,
     }
 }
 
@@ -381,6 +426,12 @@ ast_struct! {
 
 ast_struct! {
     pub struct Symbol {
+        pub name: NodeId<Ident>,
+    }
+}
+
+ast_struct! {
+    pub struct TypeName {
         pub name: NodeId<Ident>,
     }
 }

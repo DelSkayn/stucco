@@ -4,7 +4,7 @@ pub mod id;
 pub mod error;
 pub mod iter;
 pub mod render;
-pub mod thinvec;
+pub mod u32_vec;
 
 #[cfg(any(test, feature = "test"))]
 pub mod test;

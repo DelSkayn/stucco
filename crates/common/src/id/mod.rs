@@ -1,8 +1,8 @@
-mod id_set;
-mod id_vec;
+mod index_map;
+mod index_set;
 
-pub use id_set::IdSet;
-pub use id_vec::IdVec;
+pub use index_map::{IndexMap, PartialIndexMap};
+pub use index_set::IdSet;
 
 pub trait Id: Sized + Copy {
     fn idx(self) -> usize;
@@ -59,8 +59,8 @@ macro_rules! id {
                     }
             };
 
-            const fn from_u32(index: u32) -> Option<Self> {
-                if index > (u32::MAX - 1) {
+            pub const fn from_u32(index: u32) -> Option<Self> {
+                if index == u32::MAX {
                     return None;
                 }
 
@@ -69,7 +69,7 @@ macro_rules! id {
                 }
             }
 
-            const unsafe fn from_u32_unchecked(index: u32) -> Self {
+            pub const unsafe fn from_u32_unchecked(index: u32) -> Self {
                 unsafe {
                     Self{
                         id: ::std::num::NonZeroU32::new_unchecked(index as u32 ^ u32::MAX),
@@ -80,7 +80,7 @@ macro_rules! id {
                 }
             }
 
-            const fn into_u32(self) -> u32 {
+            pub const fn into_u32(self) -> u32 {
                 self.id.get() ^ u32::MAX
             }
 

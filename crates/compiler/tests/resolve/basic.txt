@@ -1,0 +1,25 @@
+fn test(a: i32, b: i32) -> i32{
+    a + mul(b,2)
+}
+
+fn mul(a: i32, b: i32) -> i32{
+    a * b
+}
+----------
+module {
+    function test {
+        test @ 'fn %test%(a: i32, b: i32) -> i32{' = [0]
+        a @ 'fn test(%a%: i32, b: i32) -> i32{' = [2]
+        b @ 'fn test(a: i32, %b%: i32) -> i32{' = [3]
+        a @ '%a% + mul(b,2)' = [2]
+        mul @ 'a + %mul%(b,2)' = [1]
+        b @ 'a + mul(%b%,2)' = [3]
+    }
+    function mul {
+        mul @ 'fn %mul%(a: i32, b: i32) -> i32{' = [1]
+        a @ 'fn mul(%a%: i32, b: i32) -> i32{' = [4]
+        b @ 'fn mul(a: i32, %b%: i32) -> i32{' = [5]
+        a @ '%a% * b' = [4]
+        b @ 'a * %b%' = [5]
+    }
+}

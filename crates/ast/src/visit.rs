@@ -1,8 +1,8 @@
 use crate::{
-    Become, BinaryExpr, Block, Break, Call, Cast, Expr, Field, If, Index, Let, Loop, Method,
-    Module, NodeId, NodeListId, Parameter, Return, Span, Stencil, Symbol, Type, TypeArray, TypeFn,
-    TypePtr, TypeReference, TypeTuple, UnaryExpr, Variant, Variation, VariationImmediate,
-    VariationSlot, While,
+    Become, BinaryExpr, Block, Break, Call, Cast, Expr, Field, FieldExpr, Function, If, Index, Let,
+    Loop, Method, Module, NodeId, NodeListId, Parameter, Return, Span, Stencil, Stmt, Struct,
+    Symbol, Type, TypeArray, TypeFn, TypeName, TypePtr, TypeReference, TypeTuple, UnaryExpr,
+    Variant, Variation, VariationConst, VariationImmediate, VariationSlot, While,
 };
 use token::token::{Ident, Lit};
 
@@ -47,13 +47,38 @@ macro_rules! implement_visitor{
 
 implement_visitor! {
     fn visit_module(visit, ast, m: NodeId<Module>) {
-        let mut cur = ast[m].stencils;
+        let mut cur = ast[m].stmts;
         while let Some(f) = ast.next_list(&mut cur) {
-            visit.visit_stencil(ast, f)?
+            visit.visit_stmt(ast, f)?
         }
         Ok(())
     }
 
+    fn visit_stmt(visit, ast, m: NodeId<Stmt>) {
+        match ast[m]{
+            Stmt::Stencil(x) =>visit.visit_stencil(ast,x),
+            Stmt::Struct(s) => visit.visit_struct(ast, s),
+            Stmt::Function(f) => visit.visit_function(ast,f),
+        }
+    }
+
+    fn visit_function(visit, ast, m: NodeId<Function>) {
+        visit.visit_symbol(ast, ast[m].sym)?;
+
+
+        let mut cur = ast[m].parameters;
+        while let Some(f) = ast.next_list(&mut cur) {
+            visit.visit_parameter(ast, f)?
+        }
+
+
+        if let Some(ty) = ast[m].output {
+            visit.visit_type(ast, ty)?;
+        }
+
+        visit.visit_expr(ast, ast[m].body)?;
+        Ok(())
+    }
 
     fn visit_stencil(visit, ast, m: NodeId<Stencil>) {
         visit.visit_symbol(ast, ast[m].sym)?;
@@ -90,6 +115,7 @@ implement_visitor! {
         match ast[m] {
             Variation::Immediate(node_id) => visit.visit_variation_immediate(ast,node_id),
             Variation::Slot(node_id) => visit.visit_variation_slot(ast,node_id),
+            Variation::Const(node_id) => visit.visit_variation_const(ast,node_id),
         }
     }
 
@@ -99,6 +125,11 @@ implement_visitor! {
 
     fn visit_variation_slot(visit,ast,m: NodeId<VariationSlot>) {
         visit.visit_symbol(ast, ast[m].sym)
+    }
+
+    fn visit_variation_const(visit,ast,m: NodeId<VariationConst>) {
+        visit.visit_symbol(ast, ast[m].sym)?;
+        visit.visit_expr(ast, ast[m].expr)
     }
 
     fn visit_parameter(visit, ast, m: NodeId<Parameter>) {
@@ -124,7 +155,7 @@ implement_visitor! {
             Expr::Become(x) => visit.visit_become(ast, x),
             Expr::Call(x) => visit.visit_call(ast, x),
             Expr::Method(x) => visit.visit_method(ast, x),
-            Expr::Field(x) => visit.visit_field(ast, x),
+            Expr::Field(x) => visit.visit_field_expr(ast, x),
             Expr::Index(x) => visit.visit_index(ast, x),
             Expr::Literal(x) => visit.visit_literal(ast, x),
             Expr::Symbol(x) => visit.visit_symbol(ast, x),
@@ -214,7 +245,7 @@ implement_visitor! {
         Ok(())
     }
 
-    fn visit_field(visit, ast, e: NodeId<Field>)  {
+    fn visit_field_expr(visit, ast, e: NodeId<FieldExpr>)  {
         visit.visit_expr(ast, ast[e].base)?;
         visit.visit_ident(ast, ast[e].field)?;
         Ok(())
@@ -259,7 +290,7 @@ implement_visitor! {
             Type::Tuple(x) => visit.visit_type_tuple(ast,x),
             Type::Ptr(x) => visit.visit_type_ptr(ast,x),
             Type::Reference(x) => visit.visit_type_reference(ast,x),
-            Type::Direct(x) => visit.visit_ident(ast,x),
+            Type::Name(x) => visit.visit_type_name(ast,x),
         }
     }
 
@@ -292,6 +323,25 @@ implement_visitor! {
 
     fn visit_type_reference(visit, ast, s: NodeId<TypeReference>)  {
         visit.visit_type(ast,ast[s].ty)?;
+        Ok(())
+    }
+
+    fn visit_type_name(visit, ast, s: NodeId<TypeName>){
+        visit.visit_ident(ast, ast[s].name)?;
+        Ok(())
+    }
+
+    fn visit_struct(visit, ast, s: NodeId<Struct>){
+        visit.visit_ident(ast, ast[s].name)?;
+        ast.iter_list_node(ast[s].fields).try_for_each(|field|{
+            visit.visit_field(ast, field)
+        })?;
+        Ok(())
+    }
+
+    fn visit_field(visit, ast, s: NodeId<Field>){
+        visit.visit_ident(ast, ast[s].name)?;
+        visit.visit_type(ast, ast[s].ty)?;
         Ok(())
     }
 

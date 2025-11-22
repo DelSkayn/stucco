@@ -31,24 +31,7 @@ impl Token for Ident {
     }
 }
 
-/*
-impl Token for Lit{
-    const NAME = "literal";
-
-    fn lex<'a>(slice: &TokenSlice<'a>) -> Option<Self> {
-        if let Some(x) = slice.literal() {
-            slice.advance();
-            Some(x.clone())
-        }else{
-            None
-        }
-    }
-}
-*/
-
 pub trait Peek: Sized {
-    //const LENGTH: usize;
-
     fn peek(slice: &TokenSlice) -> bool;
 }
 
@@ -108,17 +91,19 @@ impl_keywords! {
     else => Else,
     fn => Fn,
     if => If,
+    imm => Imm,
     loop => Loop,
     let => Let,
     mut => Mut,
+    pub => Pub,
     return => Return,
+    slot => Slot,
+    stencil => Stencil,
+    struct => Struct,
+    variant => Variant,
     while => While,
     mod => Mod,
     as => As,
-    imm => Imm,
-    slot => Slot,
-    stencil => Stencil,
-    variant => Variant,
 }
 
 macro_rules! impl_punct{

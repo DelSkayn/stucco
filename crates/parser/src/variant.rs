@@ -1,5 +1,5 @@
 use crate::{Parse, Parser, Result};
-use ast::{Variant, Variation, VariationImmediate, VariationSlot};
+use ast::{Variant, Variation, VariationConst, VariationImmediate, VariationSlot};
 use token::T;
 
 impl Parse for ast::Variant {
@@ -7,7 +7,7 @@ impl Parse for ast::Variant {
         let span = parser.expect::<T![variant]>()?.0;
 
         let name = parser.expect()?;
-        let name = parser.push(name)?;
+        let name = parser.push_set(name)?;
 
         parser.expect::<T![:]>()?;
 
@@ -20,6 +20,9 @@ impl Parse for ast::Variant {
             } else if parser.peek::<T![imm]>() {
                 let v = parser.parse_push()?;
                 Variation::Immediate(v)
+            } else if parser.peek::<T![const]>() {
+                let v = parser.parse_push()?;
+                Variation::Const(v)
             } else {
                 break;
             };
@@ -53,5 +56,15 @@ impl Parse for ast::VariationImmediate {
         let span = parser.expect::<T![imm]>()?.0;
         let sym = parser.parse_push()?;
         Ok(VariationImmediate { span, sym })
+    }
+}
+
+impl Parse for ast::VariationConst {
+    fn parse(parser: &mut Parser) -> Result<Self> {
+        let span = parser.expect::<T![const]>()?.0;
+        let sym = parser.parse_push()?;
+        parser.expect::<T![=]>()?;
+        let expr = parser.parse_push()?;
+        Ok(VariationConst { span, sym, expr })
     }
 }

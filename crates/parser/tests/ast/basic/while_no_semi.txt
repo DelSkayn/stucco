@@ -7,8 +7,8 @@ stencil foo(){
 ----------
 [0]Module {
   sym: Some,
-  stencils: Some([
-    [0]Stencil {
+  stmts: Some([
+    [0]Stmt::Stencil([0]Stencil {
       sym: [0]Symbol {
         name: [0]Ident{ sym: foo, span: 8..11 },
       },
@@ -38,6 +38,6 @@ stencil foo(){
         ]),
         returns_last: true,
       }),
-    },
+    }),
   ]),
 }

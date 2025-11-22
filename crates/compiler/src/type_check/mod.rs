@@ -3,13 +3,13 @@ mod pass;
 pub mod print;
 
 use crate::{
-    infer::pass::InferUpPass,
-    resolve::{SymbolId, Symbols},
+    resolve::{SymbolId, SymbolTable},
+    type_check::pass::InferUpPass,
 };
 use ast::{Ast, Expr, Method, NodeId, visit::Visit};
 use common::{
     id,
-    id::{Id, IdVec},
+    id::{Id, IndexMap},
 };
 use std::{cell::Cell, collections::HashMap, fmt::Write, hash::Hash};
 use token::{
@@ -74,6 +74,7 @@ pub enum Ty {
     Fn(Vec<TyId>, TyId),
     Array(TyId, usize),
     Var(Narrowing, Cell<Option<TyId>>),
+    Struct(Vec<(NodeId<Ident>, TyId)>),
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -87,22 +88,24 @@ pub struct FunctionInfo {
 }
 
 pub struct Types {
-    pub type_graph: IdVec<TyId, Ty>,
-    pub type_spans: IdVec<TyId, Option<Span>>,
-    pub block_type: IdVec<NodeId<ast::Block>, Option<TyId>>,
-    pub expr_to_type: IdVec<NodeId<ast::Expr>, Option<TyId>>,
-    pub symbol_to_type: IdVec<SymbolId, Option<TyId>>,
+    pub type_graph: IndexMap<TyId, Ty>,
+    pub type_spans: IndexMap<TyId, Option<Span>>,
+    pub block_type: IndexMap<NodeId<ast::Block>, Option<TyId>>,
+    pub expr_to_type: IndexMap<NodeId<ast::Expr>, Option<TyId>>,
+    pub name_to_type: IndexMap<NodeId<ast::TypeName>, Option<TyId>>,
+    pub symbol_to_type: IndexMap<SymbolId, Option<TyId>>,
     pub type_methods: HashMap<TyId, HashMap<String, FunctionInfo>>,
 }
 
 impl Types {
     pub fn new() -> Self {
         let mut res = Self {
-            type_graph: IdVec::new(),
-            type_spans: IdVec::new(),
-            block_type: IdVec::new(),
-            expr_to_type: IdVec::new(),
-            symbol_to_type: IdVec::new(),
+            type_graph: IndexMap::new(),
+            type_spans: IndexMap::new(),
+            block_type: IndexMap::new(),
+            expr_to_type: IndexMap::new(),
+            symbol_to_type: IndexMap::new(),
+            name_to_type: IndexMap::new(),
             type_methods: HashMap::new(),
         };
 
@@ -300,7 +303,7 @@ impl Types {
     pub fn infer(
         &mut self,
         ast: &Ast,
-        symbols: &Symbols,
+        symbols: &SymbolTable,
         root: NodeId<ast::Module>,
     ) -> Result<(), TypeError> {
         let mut pass = InferUpPass::new(symbols, self);

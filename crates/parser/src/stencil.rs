@@ -40,6 +40,34 @@ impl Parse for ast::Stencil {
     }
 }
 
+impl Parse for ast::Function {
+    fn parse(parser: &mut Parser) -> Result<Self> {
+        let span = parser.expect::<T![fn]>()?.0;
+        let sym = parser.parse_push()?;
+
+        let parameters =
+            parser.parse_parenthesized(|parser, _| parser.parse_terminated::<_, T![,]>())?;
+
+        let output = if let Some(_) = parser.eat::<T![->]>() {
+            Some(parser.parse_push()?)
+        } else {
+            None
+        };
+
+        let body = parser.parse_push()?;
+        let body = parser.push(ast::Expr::Block(body))?;
+        let span = parser.span_since(span);
+
+        Ok(ast::Function {
+            sym,
+            parameters,
+            span,
+            output,
+            body,
+        })
+    }
+}
+
 impl Parse for ast::Parameter {
     fn parse(parser: &mut Parser) -> Result<Self> {
         let span = parser.span();

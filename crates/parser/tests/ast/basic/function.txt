@@ -1,0 +1,81 @@
+fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+fn mul(a: i32, b: i32) -> i32 {
+    a * b
+}
+----------
+[0]Module {
+  sym: Some,
+  stmts: Some([
+    [0]Stmt::Function([0]Function {
+      sym: [0]Symbol {
+        name: [0]Ident{ sym: add, span: 3..6 },
+      },
+      parameters: Some([
+        [0]Parameter {
+          sym: [1]Symbol {
+            name: [1]Ident{ sym: a, span: 7..8 },
+          },
+          ty: [0]Type::Direct([2]Ident{ sym: i32, span: 10..13 }),
+        },
+        [1]Parameter {
+          sym: [2]Symbol {
+            name: [3]Ident{ sym: b, span: 15..16 },
+          },
+          ty: [1]Type::Direct([2]Ident{ sym: i32, span: 10..13 }),
+        },
+      ]),
+      output: Some([2]Type::Direct([2]Ident{ sym: i32, span: 10..13 })),
+      body: [3]Expr::Block([0]Block {
+        body: Some([
+          [2]Expr::Binary([0]BinaryExpr {
+            left: [1]Expr::Symbol([3]Symbol {
+              name: [1]Ident{ sym: a, span: 7..8 },
+            }),
+            op: Add,
+            right: [0]Expr::Symbol([4]Symbol {
+              name: [3]Ident{ sym: b, span: 15..16 },
+            }),
+          }),
+        ]),
+        returns_last: true,
+      }),
+    }),
+    [1]Stmt::Function([1]Function {
+      sym: [5]Symbol {
+        name: [4]Ident{ sym: mul, span: 48..51 },
+      },
+      parameters: Some([
+        [2]Parameter {
+          sym: [6]Symbol {
+            name: [1]Ident{ sym: a, span: 7..8 },
+          },
+          ty: [3]Type::Direct([2]Ident{ sym: i32, span: 10..13 }),
+        },
+        [3]Parameter {
+          sym: [7]Symbol {
+            name: [3]Ident{ sym: b, span: 15..16 },
+          },
+          ty: [4]Type::Direct([2]Ident{ sym: i32, span: 10..13 }),
+        },
+      ]),
+      output: Some([5]Type::Direct([2]Ident{ sym: i32, span: 10..13 })),
+      body: [7]Expr::Block([1]Block {
+        body: Some([
+          [6]Expr::Binary([1]BinaryExpr {
+            left: [5]Expr::Symbol([8]Symbol {
+              name: [1]Ident{ sym: a, span: 7..8 },
+            }),
+            op: Mull,
+            right: [4]Expr::Symbol([9]Symbol {
+              name: [3]Ident{ sym: b, span: 15..16 },
+            }),
+          }),
+        ]),
+        returns_last: true,
+      }),
+    }),
+  ]),
+}

@@ -1,0 +1,24 @@
+stencil add(a: usize, b: usize)
+    variant a:
+        slot a,
+        imm b,
+    variant b:
+        slot a,
+        slot b,
+{
+    become next(a + b);
+}
+----------
+module {
+    stencil add {
+        add @ 'stencil %add%(a: usize, b: usize)' = [0]
+        a @ 'stencil add(%a%: usize, b: usize)' = [1]
+        b @ 'stencil add(a: usize, %b%: usize)' = [2]
+        a @ 'slot %a%,' = [1]
+        b @ 'imm %b%,' = [2]
+        a @ 'slot %a%,' = [1]
+        b @ 'slot %b%,' = [2]
+        a @ 'become next(%a% + b);' = [1]
+        b @ 'become next(a + %b%);' = [2]
+    }
+}

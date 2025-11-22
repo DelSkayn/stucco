@@ -1,4 +1,4 @@
-use std::collections::{HashMap, btree_map::Entry};
+use std::collections::HashMap;
 
 use object::{
     LittleEndian, Object as _, ObjectSection as _, ObjectSymbol as _, RelocationTarget,
