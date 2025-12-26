@@ -165,7 +165,7 @@ impl<'a> InferUpPass<'a> {
 
     fn type_from_ast(&mut self, ast: &ast::Ast, ty: NodeId<ast::Type>) -> Result<TyId, TypeError> {
         match ast[ty] {
-            ast::Type::Array(_) => todo!(),
+            //ast::Type::Array(_) => todo!(),
             ast::Type::Fn(n) => {
                 let args = ast
                     .iter_list_node(ast[n].params)
@@ -178,7 +178,7 @@ impl<'a> InferUpPass<'a> {
                     .unwrap_or(Types::NIL_ID);
                 return Ok(self.ty.type_graph.push(Ty::Fn(args, output)).unwrap());
             }
-            ast::Type::Tuple(_) => todo!(),
+            //ast::Type::Tuple(_) => todo!(),
             ast::Type::Ptr(node_id) => {
                 let inner = self.type_from_ast(ast, ast[node_id].ty)?;
                 if ast[node_id].mutable {
@@ -187,7 +187,7 @@ impl<'a> InferUpPass<'a> {
                     return Ok(self.ty.type_graph.push(Ty::Ptr(inner)).unwrap());
                 }
             }
-            ast::Type::Reference(_) => todo!(),
+            //ast::Type::Reference(_) => todo!(),
             ast::Type::Name(node_id) => {
                 let ident = node_id.index(ast).name.index(ast);
                 if ident == "f32" {

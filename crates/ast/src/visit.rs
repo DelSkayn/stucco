@@ -285,11 +285,11 @@ implement_visitor! {
 
     fn visit_type(visit, ast, s: NodeId<Type>)  {
         match ast[s]{
-            Type::Array(x) => visit.visit_type_array(ast,x),
+            //Type::Array(x) => visit.visit_type_array(ast,x),
             Type::Fn(x) => visit.visit_type_fn(ast,x),
-            Type::Tuple(x) => visit.visit_type_tuple(ast,x),
+            //Type::Tuple(x) => visit.visit_type_tuple(ast,x),
             Type::Ptr(x) => visit.visit_type_ptr(ast,x),
-            Type::Reference(x) => visit.visit_type_reference(ast,x),
+            //Type::Reference(x) => visit.visit_type_reference(ast,x),
             Type::Name(x) => visit.visit_type_name(ast,x),
         }
     }

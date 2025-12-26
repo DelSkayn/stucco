@@ -39,7 +39,7 @@ impl TokenBuffer {
 
         Self::collect(stream, &mut buffer)?;
 
-        let len = buffer.len();
+        let len = buffer.len() - 1;
         buffer.push(TokenType::Back(len));
         let TokenType::Group(_, ref mut group_len) = buffer[0] else {
             unreachable!()
@@ -55,15 +55,15 @@ impl TokenBuffer {
         for t in stream {
             match t {
                 proc_macro2::TokenTree::Group(group) => {
-                    let before_len = buffer.len();
+                    let group_idx = buffer.len();
                     let stream = group.stream();
 
                     buffer.push(TokenType::Group(group, 0));
                     Self::collect(stream, buffer)?;
 
                     let after_len = buffer.len();
-                    let group_len = after_len - before_len - 1;
-                    let TokenType::Group(_, ref mut len_ref) = buffer[before_len] else {
+                    let group_len = after_len - group_idx - 1;
+                    let TokenType::Group(_, ref mut len_ref) = buffer[group_idx] else {
                         unreachable!()
                     };
                     *len_ref = group_len;
@@ -206,7 +206,7 @@ impl<'a> TokenSlice<'a> {
             TokenType::Literal(literal) => literal.span(),
             TokenType::Punct(punct) => punct.span().into(),
             TokenType::Back(count) => {
-                let TokenType::Group(g, _) = (unsafe { self.cur.get().sub(*count).as_ref() })
+                let TokenType::Group(g, _) = (unsafe { self.cur.get().sub(*count + 1).as_ref() })
                 else {
                     unreachable!()
                 };

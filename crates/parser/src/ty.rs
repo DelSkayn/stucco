@@ -13,6 +13,7 @@ impl<'src> Parse<'src> for ast::Type {
             return Ok(v);
         }
 
+        /*
         if parser.peek::<T![&]>() {
             let v = ast::Type::Reference(parser.parse_push()?);
             return Ok(v);
@@ -27,6 +28,7 @@ impl<'src> Parse<'src> for ast::Type {
             let v = ast::Type::Array(parser.parse_push()?);
             return Ok(v);
         }
+        */
 
         Ok(ast::Type::Name(parser.parse_push()?))
     }

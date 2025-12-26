@@ -274,11 +274,8 @@ ast_struct! {
 
 ast_enum! {
     pub enum Type {
-        Array(NodeId<TypeArray>),
         Fn(NodeId<TypeFn>),
-        Tuple(NodeId<TypeTuple>),
         Ptr(NodeId<TypePtr>),
-        Reference(NodeId<TypeReference>),
         Name(NodeId<TypeName>),
     }
 }

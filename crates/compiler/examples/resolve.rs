@@ -1,15 +1,10 @@
-use ast::visit::Visit;
-use common::render::{self, IndentFormatter};
 use parser::{Parser, parse_external_module};
 use std::{
     env,
     error::Error,
     io::{Read, Write as _},
 };
-use stucco_compiler::resolve::{
-    ResolveInfo, resolve,
-    symbols::print::{ResolvePrinter, format_symbol_table},
-};
+use stucco_compiler::resolve::{ResolveInfo, resolve, symbols::print::format_symbol_table};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let src = if let Some(arg) = env::args().skip(1).next() {

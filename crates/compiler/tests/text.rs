@@ -9,8 +9,7 @@ use parser::{Parser, parse_external_module};
 
 use stucco_compiler::{
     resolve::{
-        self, ResolveInfo, SymbolResolvePass, SymbolTable, TypeResolvePass, TypeTable,
-        symbols::print::format_symbol_table,
+        self, ResolveInfo, SymbolResolvePass, SymbolTable, symbols::print::format_symbol_table,
     },
     type_check::Types,
 };

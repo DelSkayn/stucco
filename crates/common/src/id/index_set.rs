@@ -50,6 +50,11 @@ where
     V: Eq + Hash,
     S: BuildHasher,
 {
+    pub fn push_expect(&mut self, v: V) -> I {
+        self.push(v)
+            .expect("Pushed too many entries into a u32::MAX limited map")
+    }
+
     pub fn push(&mut self, v: V) -> Option<I> {
         let mut hasher = self.hasher.build_hasher();
         v.hash(&mut hasher);
