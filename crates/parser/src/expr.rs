@@ -1,11 +1,11 @@
 use ast::{AstSpanned, BinOp, UnOp};
 use proc_macro2::Delimiter;
 
-use crate::{Parse, Parser, Result, prime::parse_prime};
+use crate::{Parse, ParseResult, Parser, prime::parse_prime};
 use ::token::{T, token};
 
-impl Parse for ast::Expr {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::Expr {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         parse_binding(parser, BindingPower::Base)
     }
 }
@@ -60,7 +60,10 @@ macro_rules! parse_bin_op {
     };
 }
 
-fn parse_binding(parser: &mut Parser, bp: BindingPower) -> Result<ast::Expr> {
+fn parse_binding<'src>(
+    parser: &mut Parser<'src, '_, '_>,
+    bp: BindingPower,
+) -> ParseResult<'src, ast::Expr> {
     let mut lhs = if bp <= BindingPower::Unary {
         parse_unary(parser)?
     } else {
@@ -154,7 +157,7 @@ fn parse_binding(parser: &mut Parser, bp: BindingPower) -> Result<ast::Expr> {
     Ok(lhs)
 }
 
-fn parse_unary(parser: &mut Parser) -> Result<ast::Expr> {
+fn parse_unary<'src>(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, ast::Expr> {
     let (span, op) = if let Some(t) = parser.eat::<T![!]>() {
         (t.0, UnOp::Not)
     } else if let Some(t) = parser.eat::<T![*]>() {
@@ -176,7 +179,10 @@ fn parse_unary(parser: &mut Parser) -> Result<ast::Expr> {
     Ok(ast::Expr::Unary(unary))
 }
 
-fn parse_call(parser: &mut Parser, callee: ast::Expr) -> Result<ast::Expr> {
+fn parse_call<'src>(
+    parser: &mut Parser<'src, '_, '_>,
+    callee: ast::Expr,
+) -> ParseResult<'src, ast::Expr> {
     let span = parser.span();
     let args = parser.parse_parenthesized(|parser, _| parser.parse_terminated::<_, T![,]>())?;
     let callee = parser.push(callee)?;
@@ -188,7 +194,10 @@ fn parse_call(parser: &mut Parser, callee: ast::Expr) -> Result<ast::Expr> {
     Ok(ast::Expr::Call(call))
 }
 
-fn parse_dot(parser: &mut Parser, base: ast::Expr) -> Result<ast::Expr> {
+fn parse_dot<'src>(
+    parser: &mut Parser<'src, '_, '_>,
+    base: ast::Expr,
+) -> ParseResult<'src, ast::Expr> {
     let span = parser.expect::<T![.]>()?.0;
     if parser.peek2::<token::Paren>() {
         let ident = parser.expect()?;
@@ -215,7 +224,10 @@ fn parse_dot(parser: &mut Parser, base: ast::Expr) -> Result<ast::Expr> {
     }
 }
 
-fn parse_cast(parser: &mut Parser, base: ast::Expr) -> Result<ast::Expr> {
+fn parse_cast<'src>(
+    parser: &mut Parser<'src, '_, '_>,
+    base: ast::Expr,
+) -> ParseResult<'src, ast::Expr> {
     let expr = parser.push(base)?;
     let span = parser.expect::<T![as]>()?.0;
     let ty = parser.parse_push::<ast::Type>()?;

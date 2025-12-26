@@ -6,6 +6,8 @@ use std::{
     },
 };
 
+use crate::id::IdRange;
+
 use super::Id;
 
 /// A collection mapping one, dense index to another type.
@@ -64,6 +66,12 @@ impl<I: Id, T> IndexMap<I, T> {
         I::from_idx(self.inner.len())
     }
 
+    #[inline]
+    #[track_caller]
+    pub fn next_id_expect(&self) -> I {
+        I::from_idx(self.inner.len()).expect("Pushed too many entries into a u32::MAX limited map")
+    }
+
     /// Add a new value to the vector returning the id.
     /// Will return None if the size exceeded the value the index can hold.
     #[inline]
@@ -71,6 +79,16 @@ impl<I: Id, T> IndexMap<I, T> {
         let idx = I::from_idx(self.inner.len())?;
         self.inner.push(value);
         Some(idx)
+    }
+
+    /// Add a new value to the vector returning the id.
+    /// Will return None if the size exceeded the value the index can hold.
+    #[inline]
+    #[track_caller]
+    pub fn push_expect(&mut self, value: T) -> I {
+        let idx = self.next_id_expect();
+        self.inner.push(value);
+        idx
     }
 
     /// Inserts the value the given index.
@@ -203,6 +221,18 @@ impl<I: Id, T> IndexMut<RangeInclusive<I>> for IndexMap<I, T> {
     fn index_mut(&mut self, _index: RangeInclusive<I>) -> &mut Self::Output {
         self.inner
             .index_mut(_index.start().idx()..=_index.end().idx())
+    }
+}
+
+impl<I: Id, T> Index<IdRange<I>> for IndexMap<I, T> {
+    type Output = [T];
+    fn index(&self, index: IdRange<I>) -> &Self::Output {
+        self.inner.index(index.start.idx()..=index.end.idx())
+    }
+}
+impl<I: Id, T> IndexMut<IdRange<I>> for IndexMap<I, T> {
+    fn index_mut(&mut self, index: IdRange<I>) -> &mut Self::Output {
+        self.inner.index_mut(index.start.idx()..=index.end.idx())
     }
 }
 

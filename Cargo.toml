@@ -5,7 +5,8 @@ members = [
     "crates/codegen",
     "crates/compiler",
     "crates/parser",
-    "crates/expand",
+    "crates/expand", 
+    "crates/error",
 ]
 
 [workspace.dependencies]
@@ -17,6 +18,7 @@ parser = { path = "./crates/parser", package = "stucco_parser"}
 expand = { path = "./crates/expand", package = "stucco_expand" }
 token = { path = "./crates/token", package = "stucco_token" }
 codegen = { path = "./crates/codegen", package = "stucco_codegen" }
+error = { path = "./crates/error", package = "stucco_error" }
 
 anyhow = "1"
 quote = "1.0.36"

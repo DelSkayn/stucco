@@ -4,9 +4,9 @@ use ast::{
     Ast, AstSpanned,
     visit::{self, Visit},
 };
-use common::{error, render::IndentFormatter};
+use common::render::{self, IndentFormatter};
 
-use crate::{type_check::Types, resolve::SymbolTable};
+use crate::{resolve::SymbolTable, type_check::Types};
 
 pub struct TypePrinter<'a, W> {
     terminal: bool,
@@ -72,12 +72,12 @@ where
     ) -> Result<(), Self::Error> {
         let mut byte_range = b.ast_span(ast).byte_range();
         byte_range.end = byte_range.start + 1;
-        let line = error::render_line(self.source, byte_range, self.terminal);
+        let line = render::render_line(self.source, byte_range, self.terminal);
         writeln!(self.fmt, "'{}'", line.trim())?;
         self.indent(|this| visit::visit_inner_block(this, ast, ast[b].body))?;
         if let Some(x) = self.types.block_type[b] {
             let ty = self.types.find_type(x);
-            writeln!(self.fmt, "}} = {:?}", &self.types.type_to_string(ty))
+            writeln!(self.fmt, "}} = {:?}", &self.types.type_to_string(ast, ty))
         } else {
             writeln!(self.fmt, "}} = NOT INFERED")
         }
@@ -86,11 +86,11 @@ where
     fn visit_expr(&mut self, ast: &ast::Ast, e: ast::NodeId<ast::Expr>) -> Result<(), Self::Error> {
         if !matches!(ast[e], ast::Expr::Block(_)) {
             let byte_range = e.ast_span(ast).byte_range();
-            let line = error::render_line(self.source, byte_range, self.terminal);
+            let line = render::render_line(self.source, byte_range, self.terminal);
             write!(self.fmt, "'{}'", line.trim())?;
             if let Some(x) = self.types.expr_to_type.get(e).copied().flatten() {
                 let ty = self.types.find_type(x);
-                writeln!(self.fmt, " = {:?}", &self.types.type_to_string(ty))?;
+                writeln!(self.fmt, " = {:?}", &self.types.type_to_string(ast, ty))?;
             } else {
                 writeln!(self.fmt, " = NOT INFERED")?;
             }
@@ -105,12 +105,12 @@ where
         e: ast::NodeId<ast::Symbol>,
     ) -> Result<(), Self::Error> {
         let byte_range = e.ast_span(ast).byte_range();
-        let line = error::render_line(self.source, byte_range, self.terminal);
+        let line = render::render_line(self.source, byte_range, self.terminal);
         write!(self.fmt, "'{}'", line.trim())?;
         let symbol = self.symbols.ast_to_symbol[e];
         if let Some(x) = self.types.symbol_to_type.get(symbol).copied().flatten() {
             let ty = self.types.find_type(x);
-            writeln!(self.fmt, " = {:?}", &self.types.type_to_string(ty))?;
+            writeln!(self.fmt, " = {:?}", &self.types.type_to_string(ast, ty))?;
         } else {
             writeln!(self.fmt, " = NOT INFERED")?;
         }

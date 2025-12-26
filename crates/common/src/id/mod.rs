@@ -1,8 +1,10 @@
 mod index_map;
 mod index_set;
+mod range;
 
 pub use index_map::{IndexMap, PartialIndexMap};
 pub use index_set::IdSet;
+pub use range::IdRange;
 
 pub trait Id: Sized + Copy {
     fn idx(self) -> usize;

@@ -12,6 +12,7 @@ ast = { workspace = true, features = ["span-locations"] }
 bitflags = "2.9.1"
 common = { workspace = true }
 token = { workspace = true }
+error.workspace = true
 #syn = { workspace = true ,default-features = false }
 
 [dev-dependencies]

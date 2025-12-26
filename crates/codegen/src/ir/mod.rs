@@ -373,6 +373,7 @@ impl<'ctx> VariantGen<'ctx> {
                     .unwrap()
                     .as_any_value_enum(),
                 compiler::type_check::Ty::Array(_, _) => todo!(),
+                compiler::type_check::Ty::Struct(_) => todo!(),
                 compiler::type_check::Ty::Var(..) => unreachable!(),
             };
 

@@ -1,0 +1,14 @@
+fn foo(){
+}
+
+fn foo(){
+}
+----------
+RESOLVE ERROR: Error: Cannot redeclare symbol `foo`
+  |> ???:4:4
+  |
+1 | fn foo(){
+  |    ^^^ Previously declared here
+  | ...
+4 | fn foo(){
+  |    ^^^

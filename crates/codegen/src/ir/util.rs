@@ -38,6 +38,7 @@ impl<'ctx> VariantGen<'ctx> {
             Ty::Tuple(_) => todo!(),
             Ty::Fn(..) => return None,
             Ty::Array(_, _) => todo!(),
+            Ty::Struct(_) => todo!(),
             Ty::Var(..) => panic!("unresolved type"),
         };
         Some(r)

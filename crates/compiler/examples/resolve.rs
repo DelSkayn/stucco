@@ -1,8 +1,12 @@
 use ast::visit::Visit;
 use common::render::{self, IndentFormatter};
 use parser::{Parser, parse_external_module};
-use std::{env, error::Error, io::Read};
-use stucco_compiler::resolve::{ResolveInfo, print::ResolvePrinter, resolve};
+use std::{
+    env,
+    error::Error,
+    io::{Read, Write as _},
+};
+use stucco_compiler::resolve::{ResolveInfo, resolve, symbols::print::ResolvePrinter};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let src = if let Some(arg) = env::args().skip(1).next() {
@@ -16,13 +20,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let (node, ast) = match Parser::parse_str_func(&src, parse_external_module) {
         Ok((node, ast)) => (node, ast),
         Err(e) => {
-            eprintln!("ERROR: {}", parser::error::render(&src, e));
+            let mut w = std::io::stderr().lock();
+            e.render_char_buffer().write_styled(&mut w)?;
+            writeln!(&mut w)?;
             return Ok(());
         }
     };
 
     let mut info = ResolveInfo::new();
-    match resolve(node, &ast, &mut info) {
+    match resolve(&src, node, &ast, &mut info) {
         Ok(_) => println!(
             "{}",
             render::render(|fmt| {
@@ -30,7 +36,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ResolvePrinter::new(&mut fmt, &src, &info.symbols, true).visit_module(&ast, node)
             })
         ),
-        Err(e) => eprintln!("ERROR: {}", e.render(&src)),
+        Err(e) => {
+            let mut w = std::io::stderr().lock();
+            e.render_char_buffer().write_styled(&mut w)?;
+            writeln!(&mut w)?;
+        }
     }
 
     Ok(())

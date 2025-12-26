@@ -4,7 +4,10 @@ use ast::{
     Ast, AstSpanned,
     visit::{self, Visit},
 };
-use common::{error, id::Id, render::IndentFormatter};
+use common::{
+    id::Id,
+    render::{self, IndentFormatter},
+};
 
 use crate::resolve::SymbolTable;
 
@@ -90,7 +93,7 @@ where
     }
 
     fn visit_symbol(&mut self, ast: &Ast, f: ast::NodeId<ast::Symbol>) -> Result<(), Self::Error> {
-        let line = error::render_line(self.source, f.ast_span(ast).byte_range(), self.pretty);
+        let line = render::render_line(self.source, f.ast_span(ast).byte_range(), self.pretty);
         write!(self.fmt, "{} @ '{}'", ast[f].name.index(&ast), line.trim())?;
         if let Some(x) = self.symbols.ast_to_symbol.get(f).copied() {
             writeln!(self.fmt, " = [{:?}]", x.idx())

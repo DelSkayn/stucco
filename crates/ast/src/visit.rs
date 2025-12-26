@@ -332,7 +332,7 @@ implement_visitor! {
     }
 
     fn visit_struct(visit, ast, s: NodeId<Struct>){
-        visit.visit_ident(ast, ast[s].name)?;
+        visit.visit_type_name(ast, ast[s].name)?;
         ast.iter_list_node(ast[s].fields).try_for_each(|field|{
             visit.visit_field(ast, field)
         })?;

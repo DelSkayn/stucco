@@ -1,9 +1,9 @@
-use crate::{Parse, Parser, Result};
+use crate::{Parse, ParseResult, Parser};
 use ast::{Variant, Variation, VariationConst, VariationImmediate, VariationSlot};
 use token::T;
 
-impl Parse for ast::Variant {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::Variant {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         let span = parser.expect::<T![variant]>()?.0;
 
         let name = parser.expect()?;
@@ -43,24 +43,24 @@ impl Parse for ast::Variant {
     }
 }
 
-impl Parse for ast::VariationSlot {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::VariationSlot {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         let span = parser.expect::<T![slot]>()?.0;
         let sym = parser.parse_push()?;
         Ok(VariationSlot { span, sym })
     }
 }
 
-impl Parse for ast::VariationImmediate {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::VariationImmediate {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         let span = parser.expect::<T![imm]>()?.0;
         let sym = parser.parse_push()?;
         Ok(VariationImmediate { span, sym })
     }
 }
 
-impl Parse for ast::VariationConst {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::VariationConst {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         let span = parser.expect::<T![const]>()?.0;
         let sym = parser.parse_push()?;
         parser.expect::<T![=]>()?;

@@ -1,5 +1,9 @@
 use ast::AstRender;
-use std::{env, error::Error, io::Read};
+use std::{
+    env,
+    error::Error,
+    io::{Read, Write},
+};
 use stucco_parser::{Parser, parse_external_module};
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -16,7 +20,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("{}", AstRender::new(&ast, node));
         }
         Err(e) => {
-            eprintln!("ERROR: {}", stucco_parser::error::render(&src, e))
+            let mut w = std::io::stderr().lock();
+            e.render_char_buffer().write_styled(&mut w)?;
+            writeln!(&mut w, "")?;
         }
     }
 

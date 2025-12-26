@@ -1,0 +1,15 @@
+fn foo(){
+    bar();
+}
+
+fn bar(){}
+----------
+module {
+    function foo {
+        foo @ 'fn %foo%(){' = [0]
+        bar @ '%bar%();' = [1]
+    }
+    function bar {
+        bar @ 'fn %bar%(){}' = [1]
+    }
+}

@@ -1,10 +1,10 @@
 use ast::Variant;
 use token::T;
 
-use crate::{Parse, Parser, Result};
+use crate::{Parse, ParseResult, Parser};
 
-impl Parse for ast::Stencil {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::Stencil {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         let span = parser.expect::<T![stencil]>()?.0;
         let sym = parser.parse_push()?;
 
@@ -40,8 +40,8 @@ impl Parse for ast::Stencil {
     }
 }
 
-impl Parse for ast::Function {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::Function {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         let span = parser.expect::<T![fn]>()?.0;
         let sym = parser.parse_push()?;
 
@@ -68,8 +68,8 @@ impl Parse for ast::Function {
     }
 }
 
-impl Parse for ast::Parameter {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::Parameter {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         let span = parser.span();
         let sym = parser.parse_push()?;
         parser.expect::<T![:]>()?;

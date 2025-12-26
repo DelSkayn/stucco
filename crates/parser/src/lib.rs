@@ -1,4 +1,5 @@
 use ast::{Ast, AstSpanned, Node, NodeId, NodeListId};
+use error::{AnnotationKind, Level, Snippet};
 use proc_macro2::TokenStream;
 use std::{
     fmt,
@@ -11,7 +12,6 @@ use token::{
     token::{DelimSpan, Delimiter},
 };
 
-pub mod error;
 mod expr;
 mod prime;
 mod stencil;
@@ -20,65 +20,78 @@ mod ty;
 mod util;
 mod variant;
 
-pub use error::Error;
+pub use error::Diagnostic;
 
-pub type Result<T> = StdResult<T, error::Error>;
+pub type ParseResult<'a, T> = StdResult<T, Diagnostic<'a>>;
 
-pub trait Parse: Sized {
-    fn parse(parser: &mut Parser) -> Result<Self>;
+pub trait Parse<'src>: Sized {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self>;
 }
 
-pub trait ParseFunc: Sized {
+pub trait ParseFunc<'src>: Sized {
     type Result;
 
-    fn parse_func(self, parser: &mut Parser) -> Result<Self::Result>;
+    fn parse_func(self, parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self::Result>;
 }
 
-impl<T, F: FnOnce(&mut Parser) -> Result<T>> ParseFunc for F {
+impl<'src, T, F: FnOnce(&mut Parser<'src, '_, '_>) -> ParseResult<'src, T>> ParseFunc<'src> for F {
     type Result = T;
 
-    fn parse_func(self, parser: &mut Parser) -> Result<T> {
+    fn parse_func<'a>(self, parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, T> {
         self(parser)
     }
 }
 
-pub struct Parser<'a, 'b> {
-    slice: TokenSlice<'a>,
-    ast: &'b mut Ast,
+pub struct Parser<'src, 'slice, 'ast> {
+    source: Option<&'src str>,
+    slice: TokenSlice<'slice>,
+    ast: &'ast mut Ast,
 }
 
-impl<'a, 'b> Parser<'a, 'b> {
-    pub fn parse_stream<P: Parse + ast::Node>(
+impl<'slice, 'ast> Parser<'static, 'slice, 'ast> {
+    pub fn parse_stream<P: Parse<'static> + ast::Node>(
         token_stream: TokenStream,
-    ) -> Result<(NodeId<P>, Ast)> {
-        Self::parse_inner(token_stream, |p| p.parse_push::<P>())
+    ) -> ParseResult<'static, (NodeId<P>, Ast)> {
+        Self::parse_inner(None, token_stream, |p| p.parse_push::<P>())
     }
 
-    pub fn parse_stream_func<F: ParseFunc>(
+    pub fn parse_stream_func<F: ParseFunc<'static>>(
         token_stream: TokenStream,
         func: F,
-    ) -> Result<(F::Result, Ast)> {
-        Self::parse_inner(token_stream, |p| func.parse_func(p))
+    ) -> ParseResult<'static, (F::Result, Ast)> {
+        Parser::parse_inner(None, token_stream, |p| func.parse_func(p))
     }
+}
 
-    pub fn parse_str<P: Parse + ast::Node>(str: &str) -> Result<(NodeId<P>, Ast)> {
+impl<'src, 'slice, 'ast> Parser<'src, 'slice, 'ast> {
+    pub fn parse_str<P: Parse<'src> + ast::Node>(
+        str: &'src str,
+    ) -> ParseResult<'src, (NodeId<P>, Ast)> {
         let token_stream = TokenStream::from_str(str).unwrap();
-        Self::parse_inner(token_stream, |p| p.parse_push::<P>())
+        Parser::parse_inner(Some(str), token_stream, |p| p.parse_push::<P>())
     }
 
-    pub fn parse_str_func<F: ParseFunc>(str: &str, func: F) -> Result<(F::Result, Ast)> {
+    pub fn parse_str_func<F: ParseFunc<'src>>(
+        str: &'src str,
+        func: F,
+    ) -> ParseResult<'src, (F::Result, Ast)> {
         let token_stream = TokenStream::from_str(str).unwrap();
-        Self::parse_inner(token_stream, |p| (func).parse_func(p))
+        Self::parse_inner(Some(str), token_stream, |p| (func).parse_func(p))
     }
 
-    fn parse_inner<R, F>(stream: TokenStream, f: F) -> Result<(R, Ast)>
+    fn parse_inner<R, F>(
+        source: Option<&'src str>,
+        stream: TokenStream,
+        f: F,
+    ) -> ParseResult<'src, (R, Ast)>
     where
-        F: FnOnce(&mut Parser) -> Result<R>,
+        F: FnOnce(&mut Parser<'src, '_, '_>) -> ParseResult<'src, R>,
     {
-        let tb = TokenBuffer::from_stream(stream)?;
+        let tb = TokenBuffer::from_stream(stream).unwrap();
         let slice = tb.as_slice();
         let mut ast = Ast::new();
         let mut parser = Parser {
+            source,
             slice,
             ast: &mut ast,
         };
@@ -86,16 +99,52 @@ impl<'a, 'b> Parser<'a, 'b> {
         Ok((res, ast))
     }
 
-    pub fn push<T: ast::Node>(&mut self, value: T) -> Result<NodeId<T>> {
-        Ok(self.ast.push(value)?)
+    pub fn push<T: ast::Node>(&mut self, value: T) -> ParseResult<'src, NodeId<T>> {
+        match self.ast.push(value) {
+            Ok(x) => Ok(x),
+            Err(_) => Err(self.with_error(|this| {
+                Level::Error
+                    .title("Source to large, ast contains too many nodes")
+                    .snippet(
+                        Snippet::source(this.source)
+                            .annotate(AnnotationKind::Primary.span(this.last_span())),
+                    )
+                    .to_diagnostic()
+            })),
+        }
     }
 
-    pub fn error<T: fmt::Display>(&self, message: T) -> Error {
-        println!("{}", std::backtrace::Backtrace::force_capture());
-        return Error {
-            span: self.slice.span().into(),
-            message: message.to_string(),
-        };
+    pub fn push_set<T: ast::UniqueNode>(&mut self, value: T) -> ParseResult<'src, NodeId<T>> {
+        match self.ast.push_set(value) {
+            Ok(x) => Ok(x),
+            Err(_) => Err(self.with_error(|this| {
+                Level::Error
+                    .title("Source to large, ast contains too many nodes")
+                    .snippet(
+                        Snippet::source(this.source)
+                            .annotate(AnnotationKind::Primary.span(this.last_span())),
+                    )
+                    .to_diagnostic()
+            })),
+        }
+    }
+
+    #[cold]
+    pub fn with_error<F>(&mut self, f: F) -> Diagnostic<'src>
+    where
+        F: FnOnce(&mut Self) -> Diagnostic<'src>,
+    {
+        f(self)
+    }
+
+    pub fn error<T: fmt::Display>(&self, message: T) -> Diagnostic<'src> {
+        Level::Error
+            .title(message.to_string())
+            .snippet(
+                Snippet::source(self.source)
+                    .annotate(AnnotationKind::Primary.span(self.slice.span().into())),
+            )
+            .to_diagnostic()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -107,16 +156,16 @@ impl<'a, 'b> Parser<'a, 'b> {
         self.slice.span().into()
     }
 
-    pub fn parse_push<P: Parse + ast::Node>(&mut self) -> Result<NodeId<P>> {
+    pub fn parse_push<P: Parse<'src> + ast::Node>(&mut self) -> ParseResult<'src, NodeId<P>> {
         let p = P::parse(self)?;
         self.push(p)
     }
 
-    pub fn parse<P: Parse>(&mut self) -> Result<P> {
+    pub fn parse<P: Parse<'src>>(&mut self) -> ParseResult<'src, P> {
         P::parse(self)
     }
 
-    pub fn parse_func<F: ParseFunc>(&mut self, func: F) -> Result<F::Result> {
+    pub fn parse_func<F: ParseFunc<'src>>(&mut self, func: F) -> ParseResult<'src, F::Result> {
         func.parse_func(self)
     }
 
@@ -129,16 +178,17 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
-    pub fn try_parse_delimited<F, R>(&mut self, f: F) -> Option<Result<R>>
+    pub fn try_parse_delimited<F, R>(&mut self, f: F) -> Option<ParseResult<'src, R>>
     where
-        F: FnOnce(Delimiter, DelimSpan, &mut Parser) -> Result<R>,
+        F: FnOnce(Delimiter, DelimSpan, &mut Parser<'src, '_, '_>) -> ParseResult<'src, R>,
     {
         let Some((group, slice)) = self.slice.group() else {
             return None;
         };
         let mut parser = Parser {
+            source: self.source,
             slice,
-            ast: self.ast,
+            ast: &mut *self.ast,
         };
         let res = f(group.delimiter(), group.delim_span(), &mut parser);
         if res.is_ok() {
@@ -147,9 +197,9 @@ impl<'a, 'b> Parser<'a, 'b> {
         Some(res)
     }
 
-    pub fn parse_delimiter<F, R>(&mut self, delim: Delimiter, f: F) -> Result<R>
+    pub fn parse_delimiter<F, R>(&mut self, delim: Delimiter, f: F) -> ParseResult<'src, R>
     where
-        F: FnOnce(&mut Parser, Span) -> Result<R>,
+        F: FnOnce(&mut Parser<'src, '_, '_>, Span) -> ParseResult<'src, R>,
     {
         let Some((group, slice)) = self.slice.group() else {
             println!("{}", std::backtrace::Backtrace::force_capture());
@@ -173,8 +223,9 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
 
         let mut parser = Parser {
+            source: self.source,
             slice,
-            ast: self.ast,
+            ast: &mut *self.ast,
         };
         let res = f(&mut parser, group.span().into());
         if res.is_ok() {
@@ -183,30 +234,30 @@ impl<'a, 'b> Parser<'a, 'b> {
         res
     }
 
-    pub fn parse_braced<F, R>(&mut self, f: F) -> Result<R>
+    pub fn parse_braced<F, R>(&mut self, f: F) -> ParseResult<'src, R>
     where
-        F: FnOnce(&mut Parser, Span) -> Result<R>,
+        F: FnOnce(&mut Parser<'src, '_, '_>, Span) -> ParseResult<'src, R>,
     {
         self.parse_delimiter(Delimiter::Brace, f)
     }
 
-    pub fn parse_bracketed<F, R>(&mut self, f: F) -> Result<R>
+    pub fn parse_bracketed<F, R>(&mut self, f: F) -> ParseResult<'src, R>
     where
-        F: FnOnce(&mut Parser, Span) -> Result<R>,
+        F: FnOnce(&mut Parser<'src, '_, '_>, Span) -> ParseResult<'src, R>,
     {
         self.parse_delimiter(Delimiter::Bracket, f)
     }
 
-    pub fn parse_parenthesized<F, R>(&mut self, f: F) -> Result<R>
+    pub fn parse_parenthesized<F, R>(&mut self, f: F) -> ParseResult<'src, R>
     where
-        F: FnOnce(&mut Parser, Span) -> Result<R>,
+        F: FnOnce(&mut Parser<'src, '_, '_>, Span) -> ParseResult<'src, R>,
     {
         self.parse_delimiter(Delimiter::Parenthesis, f)
     }
 
-    pub fn parse_terminated<P, D>(&mut self) -> Result<Option<NodeListId<P>>>
+    pub fn parse_terminated<P, D>(&mut self) -> ParseResult<'src, Option<NodeListId<P>>>
     where
-        P: Parse + Node,
+        P: Parse<'src> + Node,
         D: Token,
     {
         let mut head = None;
@@ -245,7 +296,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         T::lex(&self.slice)
     }
 
-    pub fn expect<T: Token>(&self) -> Result<T> {
+    pub fn expect<T: Token>(&self) -> ParseResult<'src, T> {
         if let Some(t) = T::lex(&self.slice) {
             Ok(t)
         } else {
@@ -253,7 +304,7 @@ impl<'a, 'b> Parser<'a, 'b> {
         }
     }
 
-    pub fn unexpected(&self, expected: &str) -> Error {
+    pub fn unexpected(&self, expected: &str) -> Diagnostic<'src> {
         self.error(format_args!(
             "Unexpected token '{}' expected '{}'",
             self.slice.format_cur(),
@@ -268,9 +319,30 @@ impl<'a, 'b> Parser<'a, 'b> {
     pub fn span_since(&self, span: Span) -> Span {
         span.try_join(self.last_span())
     }
+
+    pub fn push_list<T: Node>(
+        &mut self,
+        head: &mut Option<NodeListId<T>>,
+        current: &mut Option<NodeListId<T>>,
+        value: NodeId<T>,
+    ) -> ParseResult<'src, ()> {
+        if self.ast.push_list(head, current, value).is_err() {
+            return Err(Level::Error
+                .title("Source to large")
+                .snippet(
+                    Snippet::source(self.source).annotate(
+                        AnnotationKind::Primary
+                            .span(self.last_span())
+                            .label("Hit the maximum source code size here"),
+                    ),
+                )
+                .to_diagnostic());
+        }
+        Ok(())
+    }
 }
 
-impl Deref for Parser<'_, '_> {
+impl Deref for Parser<'_, '_, '_> {
     type Target = Ast;
 
     fn deref(&self) -> &Self::Target {
@@ -278,14 +350,16 @@ impl Deref for Parser<'_, '_> {
     }
 }
 
-impl DerefMut for Parser<'_, '_> {
+impl DerefMut for Parser<'_, '_, '_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.ast
     }
 }
 
 /// parses a module in the form of `mod bla { stencil foo() { .. } }`
-pub fn parse_wrapped_module(parser: &mut Parser) -> Result<NodeId<ast::Module>> {
+pub fn parse_wrapped_module<'src>(
+    parser: &mut Parser<'src, '_, '_>,
+) -> ParseResult<'src, NodeId<ast::Module>> {
     let span = parser.expect::<T![mod]>()?.0;
     let sym = parser.parse_push()?;
 
@@ -313,7 +387,9 @@ pub fn parse_wrapped_module(parser: &mut Parser) -> Result<NodeId<ast::Module>> 
 }
 
 /// parses a module in the form of `stencil foo() { .. }` i.e. imported from an external file.
-pub fn parse_external_module(parser: &mut Parser) -> Result<NodeId<ast::Module>> {
+pub fn parse_external_module<'src>(
+    parser: &mut Parser<'src, '_, '_>,
+) -> ParseResult<'src, NodeId<ast::Module>> {
     let start_span = parser.span();
     let mut end_span = None;
 

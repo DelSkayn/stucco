@@ -8,7 +8,7 @@ use common::{
 use parser::{Parser, parse_external_module};
 
 use stucco_compiler::{
-    resolve::{self, ResolveInfo, print::ResolvePrinter},
+    resolve::{self, ResolveInfo, SymbolResolvePass, SymbolTable, symbols::print::ResolvePrinter},
     type_check::Types,
 };
 
@@ -17,13 +17,13 @@ fn infer_text_tests() {
     string_test_runner(&current_file_path().join("infer"), |src| {
         let (node, ast) = match Parser::parse_str_func(&src, parse_external_module) {
             Ok(x) => x,
-            Err(e) => return format!("PARSE ERROR: {}", e.render(src)),
+            Err(e) => return format!("PARSE ERROR: {}", e.render_string()),
         };
 
         let mut info = ResolveInfo::new();
-        match resolve::resolve(node, &ast, &mut info) {
+        match resolve::resolve(src, node, &ast, &mut info) {
             Ok(x) => x,
-            Err(e) => return format!("RESOLVE ERROR: {}", e.render(src)),
+            Err(e) => return format!("RESOLVE ERROR: {}", e.render_string()),
         };
 
         let mut types = Types::new();
@@ -45,21 +45,21 @@ fn infer_text_tests() {
 }
 
 #[test]
-fn resolve_text_tests() {
+fn resolve_symbol_text_tests() {
     string_test_runner(&current_file_path().join("resolve"), |src| {
         let (node, ast) = match Parser::parse_str_func(&src, parse_external_module) {
             Ok(x) => x,
-            Err(e) => return format!("PARSE ERROR: {}", e.render(src)),
+            Err(e) => return format!("PARSE ERROR: {}", e.render_string()),
         };
-        let mut info = ResolveInfo::new();
-        match resolve::resolve(node, &ast, &mut info) {
+        let mut symbol_table = SymbolTable::new();
+        let _root = match SymbolResolvePass::new(src, &mut symbol_table).pass(&ast, node) {
             Ok(x) => x,
-            Err(e) => return format!("RESOLVE ERROR: {}", e.render(src)),
+            Err(e) => return format!("RESOLVE ERROR: {}", e.render_string()),
         };
 
         let mut s = String::new();
         let mut fmt = IndentFormatter::new(&mut s, 4);
-        ResolvePrinter::new(&mut fmt, src, &info.symbols, false)
+        ResolvePrinter::new(&mut fmt, src, &symbol_table, false)
             .visit_module(&ast, node)
             .unwrap();
 

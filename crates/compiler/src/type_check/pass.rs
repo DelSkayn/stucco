@@ -1,11 +1,11 @@
-use std::{cell::Cell, collections::HashMap};
+use std::cell::Cell;
 
 use ast::{
-    Ast, AstSpanned, Block, Expr, Method, NodeId,
+    Ast, AstSpanned, Block, Expr, Method, NodeId, TypeName,
     visit::{self, Visit},
 };
-use common::iter::IterExt;
-use token::token::{Ident, Lit, LitIntSuffix};
+use common::{id::IndexMap, iter::IterExt};
+use token::token::{Lit, LitIntSuffix};
 
 use crate::{
     resolve::SymbolTable,
@@ -14,12 +14,10 @@ use crate::{
 
 pub struct DeclarePass<'a> {
     ty: &'a mut Types,
-    names: HashMap<NodeId<Ident>, TyId>,
+    names: IndexMap<NodeId<TypeName>, Option<TyId>>,
 }
 
-impl DeclarePass {}
-
-impl Visit for DeclarePass {
+impl Visit for DeclarePass<'_> {
     type Error = ();
 
     fn visit_stmt(&mut self, ast: &ast::Ast, s: NodeId<ast::Stmt>) -> Result<(), Self::Error> {
@@ -28,8 +26,7 @@ impl Visit for DeclarePass {
             ast::Stmt::Stencil(_) | ast::Stmt::Function(_) => return Ok(()),
         };
         self.names
-            .entry(ast[s])
-            .or_insert_with(|| self.ty.new_type_var(Narrowing::None));
+            .insert_fill_default(ast[s].name, Some(self.ty.new_type_var(Narrowing::None)));
 
         Ok(())
     }
@@ -192,7 +189,7 @@ impl<'a> InferUpPass<'a> {
             }
             ast::Type::Reference(_) => todo!(),
             ast::Type::Name(node_id) => {
-                let ident = &ast[node_id];
+                let ident = node_id.index(ast).name.index(ast);
                 if ident == "f32" {
                     return Ok(Types::F32_ID);
                 }
@@ -282,7 +279,7 @@ impl<'a> InferUpPass<'a> {
             Ty::RefMut(x) => return self.resolve_method(ast, method, x),
             Ty::Tuple(_) => {}
             Ty::Fn(_, _) => {}
-            Ty::Array(_, _) => todo!(),
+            Ty::Array(_, _) | Ty::Struct(_) => todo!(),
             Ty::Var(_, _) => return Err(TypeError::TypeMustBeKnown(method)),
         }
         return Err(TypeError::UnknownMethod(

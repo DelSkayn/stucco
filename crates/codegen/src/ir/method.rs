@@ -229,7 +229,7 @@ impl<'ctx> VariantGen<'ctx> {
             panic!(
                 "Method {} for type {} not implemented",
                 name,
-                self.ctx.types.type_to_string(ty)
+                self.ctx.types.type_to_string(&self.ctx.ast, ty)
             );
         };
         res

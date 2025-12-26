@@ -1,9 +1,9 @@
 use token::T;
 
-use crate::{Parse, Parser, Result};
+use crate::{Parse, ParseResult, Parser};
 
-impl Parse for ast::Stmt {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::Stmt {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         if parser.peek::<T![stencil]>() {
             let s = parser.parse_push()?;
             return Ok(ast::Stmt::Stencil(s));

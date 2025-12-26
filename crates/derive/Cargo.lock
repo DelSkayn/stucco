@@ -259,6 +259,7 @@ dependencies = [
  "bitflags",
  "stucco_ast",
  "stucco_common",
+ "stucco_error",
  "stucco_token",
 ]
 
@@ -268,6 +269,14 @@ version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "stucco_expand",
+]
+
+[[package]]
+name = "stucco_error"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "stucco_token",
 ]
 
 [[package]]
@@ -291,6 +300,7 @@ dependencies = [
  "proc-macro2",
  "stucco_ast",
  "stucco_common",
+ "stucco_error",
  "stucco_token",
 ]
 

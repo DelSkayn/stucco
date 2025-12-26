@@ -1,7 +1,7 @@
 //! Token implementations.
 use crate::buffer::TokenSlice;
-use proc_macro2::Spacing;
 pub use proc_macro2::{Delimiter, Ident, extra::DelimSpan};
+use proc_macro2::{Spacing, Span};
 
 mod lit;
 pub use lit::{IntType, Lit, LitBool, LitInt, LitIntSuffix, LitStr, parse_literal};
@@ -23,6 +23,9 @@ impl Token for Ident {
 
     fn lex<'a>(slice: &TokenSlice<'a>) -> Option<Self> {
         if let Some(ident) = slice.ident() {
+            if KW_SET.with(|x| x.contains(ident)) {
+                return None;
+            }
             slice.advance();
             return Some(ident.clone());
         } else {
@@ -37,6 +40,16 @@ pub trait Peek: Sized {
 
 macro_rules! impl_keywords {
     ($($kw:ident => $type:ident),*$(,)?) => {
+
+        thread_local!{
+            static KW_SET: std::collections::HashSet::<Ident> =
+                [
+                    $(
+                        Ident::new(stringify!($kw),Span::call_site())
+                    ),*
+                ].into_iter().collect()
+        }
+
         $(
             pub struct $type(pub $crate::Span);
 
@@ -108,6 +121,7 @@ impl_keywords! {
 
 macro_rules! impl_punct{
     ($([$punct:tt]=> $type:ident),*$(,)?) => {
+
         $(
 
         #[derive(Debug)]

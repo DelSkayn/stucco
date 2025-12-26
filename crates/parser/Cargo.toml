@@ -12,6 +12,7 @@ nightly = []
 token = { workspace = true }
 ast = { workspace = true }
 common = { workspace = true }
+error.workspace = true
 proc-macro2 = { workspace = true }
 
 [dev-dependencies]

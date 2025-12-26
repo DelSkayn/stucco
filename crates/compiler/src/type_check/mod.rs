@@ -93,6 +93,7 @@ pub struct Types {
     pub block_type: IndexMap<NodeId<ast::Block>, Option<TyId>>,
     pub expr_to_type: IndexMap<NodeId<ast::Expr>, Option<TyId>>,
     pub name_to_type: IndexMap<NodeId<ast::TypeName>, Option<TyId>>,
+    pub type_to_name: HashMap<TyId, NodeId<ast::TypeName>>,
     pub symbol_to_type: IndexMap<SymbolId, Option<TyId>>,
     pub type_methods: HashMap<TyId, HashMap<String, FunctionInfo>>,
 }
@@ -106,6 +107,7 @@ impl Types {
             expr_to_type: IndexMap::new(),
             symbol_to_type: IndexMap::new(),
             name_to_type: IndexMap::new(),
+            type_to_name: HashMap::new(),
             type_methods: HashMap::new(),
         };
 
@@ -168,17 +170,18 @@ impl Types {
     }
 
     fn occurs_in(&self, ty: TyId, inside: TyId) -> bool {
-        match self.type_graph[inside] {
+        match &self.type_graph[inside] {
             Ty::Var(..) | Ty::Prim(_) => false,
             Ty::Ptr(x) | Ty::PtrMut(x) | Ty::Ref(x) | Ty::RefMut(x) | Ty::Array(x, _) => {
-                x == ty || self.occurs_in(ty, x)
+                *x == ty || self.occurs_in(ty, *x)
             }
-            Ty::Tuple(ref x) => x.iter().copied().any(|x| x == ty || self.occurs_in(ty, x)),
-            Ty::Fn(ref x, r) => {
-                x.contains(&r)
-                    || self.occurs_in(ty, r)
+            Ty::Tuple(x) => x.iter().copied().any(|x| x == ty || self.occurs_in(ty, x)),
+            Ty::Fn(x, r) => {
+                x.contains(r)
+                    || self.occurs_in(ty, *r)
                     || x.iter().copied().any(|x| x == ty || self.occurs_in(ty, x))
             }
+            Ty::Struct(x) => x.iter().any(|x| self.occurs_in(ty, x.1)),
         }
     }
 
@@ -431,14 +434,14 @@ impl Types {
     }
 
     /// Formats a type id as a string.
-    pub fn type_to_string(&self, ty: TyId) -> String {
+    pub fn type_to_string(&self, ast: &Ast, ty: TyId) -> String {
         let mut buf = String::new();
         let mut type_name = 0;
-        self.type_to_string_rec(ty, &mut buf, &mut type_name);
+        self.type_to_string_rec(ast, ty, &mut buf, &mut type_name);
         buf
     }
 
-    fn type_to_string_rec(&self, ty: TyId, buf: &mut String, type_name: &mut usize) {
+    fn type_to_string_rec(&self, ast: &Ast, ty: TyId, buf: &mut String, type_name: &mut usize) {
         let ty = self.find_type(ty);
         match self.type_graph[ty] {
             Ty::Prim(ref prim_ty) => {
@@ -463,19 +466,19 @@ impl Types {
             }
             Ty::Ptr(t) => {
                 buf.push_str("*const ");
-                self.type_to_string_rec(t, buf, type_name);
+                self.type_to_string_rec(ast, t, buf, type_name);
             }
             Ty::PtrMut(t) => {
                 buf.push_str("*mut ");
-                self.type_to_string_rec(t, buf, type_name);
+                self.type_to_string_rec(ast, t, buf, type_name);
             }
             Ty::Ref(t) => {
                 buf.push_str("&");
-                self.type_to_string_rec(t, buf, type_name);
+                self.type_to_string_rec(ast, t, buf, type_name);
             }
             Ty::RefMut(t) => {
                 buf.push_str("&mut ");
-                self.type_to_string_rec(t, buf, type_name);
+                self.type_to_string_rec(ast, t, buf, type_name);
             }
             Ty::Tuple(ref ty_ids) => {
                 buf.push_str("(");
@@ -483,7 +486,7 @@ impl Types {
                     if idx != 0 {
                         buf.push_str(", ");
                     }
-                    self.type_to_string_rec(t, buf, type_name);
+                    self.type_to_string_rec(ast, t, buf, type_name);
                 }
                 buf.push_str(")");
             }
@@ -493,17 +496,17 @@ impl Types {
                     if idx != 0 {
                         buf.push_str(", ");
                     }
-                    self.type_to_string_rec(t, buf, type_name);
+                    self.type_to_string_rec(ast, t, buf, type_name);
                 }
                 buf.push_str(")");
                 if ty_id != Types::NIL_ID {
                     buf.push_str(" -> ");
-                    self.type_to_string_rec(ty_id, buf, type_name);
+                    self.type_to_string_rec(ast, ty_id, buf, type_name);
                 }
             }
             Ty::Array(ty_id, s) => {
                 buf.push_str("[");
-                self.type_to_string_rec(ty_id, buf, type_name);
+                self.type_to_string_rec(ast, ty_id, buf, type_name);
                 buf.push_str(";");
                 writeln!(buf, "{s}").unwrap();
                 buf.push_str("]");
@@ -526,6 +529,13 @@ impl Types {
                         break;
                     }
                 }
+            }
+            Ty::Struct(_) => {
+                let id = self
+                    .type_to_name
+                    .get(&ty)
+                    .expect("All types with specific names should have their id's registered");
+                write!(buf, "{}", id.index(ast).name.index(ast)).unwrap();
             }
         }
     }

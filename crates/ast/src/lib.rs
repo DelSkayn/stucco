@@ -1,9 +1,9 @@
 mod ast;
 pub mod visit;
 
-pub use ast::Node;
 use ast::NodeLibrary;
 pub use ast::{AstSpanned, NodeId, NodeList, NodeListId, PushNodeError};
+pub use ast::{Node, UniqueNode};
 use common::{id::IdSet, u32_vec::U32Vec};
 use token::{
     Span,
@@ -350,7 +350,7 @@ ast_enum! {
 ast_struct! {
     pub struct Struct{
         pub public: bool,
-        pub name: NodeId<Ident>,
+        pub name: NodeId<TypeName>,
         pub fields: Option<NodeListId<Field>>,
     }
 }

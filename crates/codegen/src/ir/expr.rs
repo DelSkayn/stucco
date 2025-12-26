@@ -466,6 +466,7 @@ impl<'ctx> VariantGen<'ctx> {
                     Ty::Fn(..) => todo!(),
                     Ty::Array(..) => todo!(),
                     Ty::Var(..) => todo!(),
+                    Ty::Struct(..) => todo!(),
                 }
             }
             ast::BinOp::And => todo!(),

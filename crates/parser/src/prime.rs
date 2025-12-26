@@ -1,7 +1,7 @@
-use crate::{Parse, Parser, Result, util};
+use crate::{Parse, ParseResult, Parser, util};
 use ::token::{T, token};
 
-pub fn parse_prime(parser: &mut Parser) -> Result<ast::Expr> {
+pub fn parse_prime<'src>(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, ast::Expr> {
     if parser.peek::<T![if]>() {
         let expr = parser.parse_push()?;
         return Ok(ast::Expr::If(expr));
@@ -52,8 +52,8 @@ pub fn parse_prime(parser: &mut Parser) -> Result<ast::Expr> {
     Ok(ast::Expr::Symbol(parse))
 }
 
-impl Parse for ast::If {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::If {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         let span = parser.expect::<T![if]>()?.0;
         let condition = parser.parse_push()?;
         let then = parser.parse_push()?;
@@ -72,8 +72,8 @@ impl Parse for ast::If {
     }
 }
 
-impl Parse for ast::While {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::While {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         let span = parser.expect::<T![while]>()?.0;
         let condition = parser.parse_push()?;
         let then = parser.parse_push()?;
@@ -86,8 +86,8 @@ impl Parse for ast::While {
     }
 }
 
-impl Parse for ast::Loop {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::Loop {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         let span = parser.expect::<T![loop]>()?.0;
         let body = parser.parse_push()?;
 
@@ -97,8 +97,8 @@ impl Parse for ast::Loop {
     }
 }
 
-impl Parse for ast::Become {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::Become {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         let span = parser.span();
         parser.expect::<T![become]>()?;
         let callee = parser.expect()?;
@@ -108,8 +108,8 @@ impl Parse for ast::Become {
     }
 }
 
-impl Parse for ast::Let {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::Let {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         let span = parser.expect::<T![let]>()?.0;
 
         let mutable = parser.eat::<T![mut]>().is_some();
@@ -134,8 +134,8 @@ impl Parse for ast::Let {
     }
 }
 
-impl Parse for ast::Return {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::Return {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         let span = parser.expect::<T![return]>()?.0;
         if parser.peek::<T![;]>() || parser.is_empty() {
             return Ok(ast::Return { expr: None, span });
@@ -149,8 +149,8 @@ impl Parse for ast::Return {
     }
 }
 
-impl Parse for ast::Break {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::Break {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         let span = parser.expect::<T![break]>()?.0;
         if parser.peek::<T![;]>() || parser.is_empty() {
             return Ok(ast::Break { expr: None, span });
@@ -164,8 +164,8 @@ impl Parse for ast::Break {
     }
 }
 
-impl Parse for ast::Symbol {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::Symbol {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         let ident: token::Ident = parser.expect()?;
         let span = ident.span().into();
         let ident = parser.push_set(ident)?;
@@ -173,8 +173,8 @@ impl Parse for ast::Symbol {
     }
 }
 
-impl Parse for ast::Block {
-    fn parse(parser: &mut Parser) -> Result<Self> {
+impl<'src> Parse<'src> for ast::Block {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         let span = parser.span();
 
         let mut returns_last = false;

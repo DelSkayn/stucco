@@ -1,0 +1,9 @@
+fn foo(a: usize, a: usize){ }
+----------
+RESOLVE ERROR: Error: Cannot redeclare symbol `a`
+  |> ???:1:18
+  |
+1 | fn foo(a: usize, a: usize){ }
+  |                  ^ 
+1 | fn foo(a: usize, a: usize){ }
+  |        ^ Previously declared here

@@ -10,7 +10,7 @@ fn ast_test() {
             Ok((node, ast)) => {
                 format!("{}", AstRender::new(&ast, node))
             }
-            Err(e) => e.render(src),
+            Err(e) => e.render_string(),
         },
     )
 }

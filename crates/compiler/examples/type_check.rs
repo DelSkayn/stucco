@@ -1,7 +1,11 @@
 use ast::{AstSpanned as _, visit::Visit};
 use common::render::{self, IndentFormatter};
 use parser::{Parser, parse_external_module};
-use std::{env, error::Error, io::Read};
+use std::{
+    env,
+    error::Error,
+    io::{Read, Write},
+};
 use stucco_compiler::{
     resolve::{ResolveInfo, resolve},
     type_check::{TypeError, Types, print::TypePrinter},
@@ -20,16 +24,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let (node, ast) = match Parser::parse_str_func(&src, parse_external_module) {
         Ok((node, ast)) => (node, ast),
         Err(e) => {
-            eprintln!("ERROR: {}", parser::error::render(&src, e));
+            let mut w = std::io::stderr().lock();
+            e.render_char_buffer().write_styled(&mut w)?;
+            writeln!(&mut w)?;
             return Ok(());
         }
     };
 
     let mut info = ResolveInfo::new();
-    match resolve(node, &ast, &mut info) {
+    match resolve(&src, node, &ast, &mut info) {
         Ok(s) => s,
         Err(e) => {
-            eprintln!("ERROR: {}", e.render(&src));
+            let mut w = std::io::stderr().lock();
+            e.render_char_buffer().write_styled(&mut w)?;
+            writeln!(&mut w)?;
             return Ok(());
         }
     };
@@ -49,25 +57,25 @@ fn main() -> Result<(), Box<dyn Error>> {
                 TypeError::Mismatch(a, b) => {
                     eprintln!(
                         "Unexpected type {}, expected {}",
-                        types.type_to_string(a),
-                        types.type_to_string(b)
+                        types.type_to_string(&ast, a),
+                        types.type_to_string(&ast, b)
                     )
                 }
                 TypeError::LiteralOverflow(lit, ty) => {
                     eprintln!(
                         "Can't fit '{:?}' in type {}",
                         ast[lit].span().source_text(),
-                        types.type_to_string(ty)
+                        types.type_to_string(&ast, ty)
                     )
                 }
                 TypeError::UnknownMethod(lit, ty) => {
                     eprintln!(
                         "unknown method '{:?}' for type {}",
                         ast[lit].span().source_text(),
-                        types.type_to_string(ty)
+                        types.type_to_string(&ast, ty)
                     )
                 }
-                TypeError::UnknownType(ty, span) => {
+                TypeError::UnknownType(ty, _) => {
                     eprintln!("unknown type '{:?}'", ast[ty].ast_span(&ast).source_text(),)
                 }
                 _ => {}
