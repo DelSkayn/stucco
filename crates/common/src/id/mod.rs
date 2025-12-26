@@ -6,10 +6,12 @@ pub use index_map::{IndexMap, PartialIndexMap};
 pub use index_set::IdSet;
 pub use range::IdRange;
 
-pub trait Id: Sized + Copy {
+pub trait Id: Sized + Copy + Eq + PartialEq {
     fn idx(self) -> usize;
 
     fn from_idx(idx: usize) -> Option<Self>;
+
+    fn next(self) -> Option<Self>;
 }
 
 impl Id for u32 {
@@ -19,6 +21,10 @@ impl Id for u32 {
 
     fn from_idx(idx: usize) -> Option<Self> {
         idx.try_into().ok()
+    }
+
+    fn next(self) -> Option<Self> {
+        self.checked_add(1)
     }
 }
 
@@ -39,6 +45,10 @@ macro_rules! id {
 
             fn from_idx(idx: usize) -> Option<Self>{
                 idx.try_into().ok().and_then(Self::from_u32)
+            }
+
+            fn next(self) -> Option<Self>{
+                Self::from_u32(self.into_u32() + 1)
             }
         }
 

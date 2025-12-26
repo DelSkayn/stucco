@@ -6,7 +6,10 @@ use std::{
     error::Error,
     io::{Read, Write as _},
 };
-use stucco_compiler::resolve::{ResolveInfo, resolve, symbols::print::ResolvePrinter};
+use stucco_compiler::resolve::{
+    ResolveInfo, resolve,
+    symbols::print::{ResolvePrinter, format_symbol_table},
+};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let src = if let Some(arg) = env::args().skip(1).next() {
@@ -17,7 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         buf
     };
 
-    let (node, ast) = match Parser::parse_str_func(&src, parse_external_module) {
+    let (root_node, ast) = match Parser::parse_str_func(&src, parse_external_module) {
         Ok((node, ast)) => (node, ast),
         Err(e) => {
             let mut w = std::io::stderr().lock();
@@ -28,13 +31,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let mut info = ResolveInfo::new();
-    match resolve(&src, node, &ast, &mut info) {
-        Ok(_) => println!(
+    match resolve(&src, root_node, &ast, &mut info) {
+        Ok(root_scope) => println!(
             "{}",
-            render::render(|fmt| {
-                let mut fmt = IndentFormatter::new(fmt, 2);
-                ResolvePrinter::new(&mut fmt, &src, &info.symbols, true).visit_module(&ast, node)
-            })
+            format_symbol_table(&src, &ast, &info.symbols, root_node, root_scope, true)
         ),
         Err(e) => {
             let mut w = std::io::stderr().lock();

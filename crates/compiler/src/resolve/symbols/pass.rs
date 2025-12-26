@@ -4,6 +4,7 @@ use ast::{
     Ast, NodeId, NodeListId, Variation,
     visit::{self, Visit},
 };
+use common::id::IdRange;
 use error::{AnnotationKind, Diagnostic, Level, Snippet};
 use token::token::Ident;
 
@@ -106,7 +107,7 @@ impl<'src, 't> SymbolResolvePass<'src, 't> {
 
         if let Some(first) = first {
             let last = last.expect("if first is set, then last must also be set");
-            self.table.scopes[scope_id].symbols = Some(first..=last);
+            self.table.scopes[scope_id].symbols = Some(IdRange::new(first, last));
         }
 
         assert!(self.active_symbols.is_empty());
@@ -158,7 +159,7 @@ impl<'src, 't> SymbolResolvePass<'src, 't> {
         if let Some(first) = first {
             let last = last.expect("if first is set, then last must also be set");
             let current = self.pending_scopes.last_mut().unwrap();
-            current.children = Some(first..=last);
+            current.children = Some(IdRange::new(first, last));
         }
 
         // push all the symbols in the right place.
@@ -192,7 +193,7 @@ impl<'src, 't> SymbolResolvePass<'src, 't> {
         if let Some(first) = first {
             let last = last.expect("if first is set, then last must also be set");
             let current = self.pending_scopes.last_mut().unwrap();
-            current.symbols = Some(first..=last);
+            current.symbols = Some(IdRange::new(first, last));
         }
 
         r
@@ -392,13 +393,13 @@ impl<'src, 't> Visit for SymbolResolvePass<'src, 't> {
         }
     }
     fn visit_let(&mut self, ast: &Ast, id: NodeId<ast::Let>) -> Result<(), Self::Error> {
+        self.visit_expr(ast, ast[id].expr)?;
         let kind = if ast[id].mutable {
             SymbolKind::LocalMut
         } else {
             SymbolKind::Local
         };
-        self.declare_symbol(ast, ast[id].sym, kind)?;
-        self.visit_expr(ast, ast[id].expr)
+        self.declare_symbol(ast, ast[id].sym, kind)
     }
 
     fn visit_parameter(&mut self, _: &Ast, _: NodeId<ast::Parameter>) -> Result<(), Self::Error> {

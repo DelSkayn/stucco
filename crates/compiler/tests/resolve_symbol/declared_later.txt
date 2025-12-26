@@ -1,0 +1,27 @@
+fn foo(){
+    bar();
+}
+
+fn bar(){}
+----------
+DECLARED:
+    module{
+        [0] = foo @ 'fn %foo%(){'
+        [1] = bar @ 'fn %bar%(){}'
+        stencil{
+            block{
+            }
+        }
+        stencil{
+        }
+    }
+USES:
+    module {
+        function foo {
+            [0] = foo @ 'fn %foo%(){'
+            [1] = bar @ '%bar%();'
+        }
+        function bar {
+            [1] = bar @ 'fn %bar%(){}'
+        }
+    }

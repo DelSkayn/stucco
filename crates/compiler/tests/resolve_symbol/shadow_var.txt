@@ -1,0 +1,23 @@
+fn foo(){
+  let a = 1;
+  let a = 2;
+  a + 1;
+}
+----------
+DECLARED:
+    module{
+        [0] = foo @ 'fn %foo%(){'
+        stencil{
+            block{
+                [1] = a @ 'let %a% = 1;'
+                [2] = a @ 'let %a% = 2;'
+            }
+        }
+    }
+USES:
+    module {
+        function foo {
+            [0] = foo @ 'fn %foo%(){'
+            [2] = a @ '%a% + 1;'
+        }
+    }

@@ -8,7 +8,10 @@ use common::{
 use parser::{Parser, parse_external_module};
 
 use stucco_compiler::{
-    resolve::{self, ResolveInfo, SymbolResolvePass, SymbolTable, symbols::print::ResolvePrinter},
+    resolve::{
+        self, ResolveInfo, SymbolResolvePass, SymbolTable, TypeResolvePass, TypeTable,
+        symbols::print::format_symbol_table,
+    },
     type_check::Types,
 };
 
@@ -19,7 +22,6 @@ fn infer_text_tests() {
             Ok(x) => x,
             Err(e) => return format!("PARSE ERROR: {}", e.render_string()),
         };
-
         let mut info = ResolveInfo::new();
         match resolve::resolve(src, node, &ast, &mut info) {
             Ok(x) => x,
@@ -46,23 +48,18 @@ fn infer_text_tests() {
 
 #[test]
 fn resolve_symbol_text_tests() {
-    string_test_runner(&current_file_path().join("resolve"), |src| {
-        let (node, ast) = match Parser::parse_str_func(&src, parse_external_module) {
+    string_test_runner(&current_file_path().join("resolve_symbol"), |src| {
+        let (root_node, ast) = match Parser::parse_str_func(&src, parse_external_module) {
             Ok(x) => x,
             Err(e) => return format!("PARSE ERROR: {}", e.render_string()),
         };
         let mut symbol_table = SymbolTable::new();
-        let _root = match SymbolResolvePass::new(src, &mut symbol_table).pass(&ast, node) {
+        let root_scope = match SymbolResolvePass::new(src, &mut symbol_table).pass(&ast, root_node)
+        {
             Ok(x) => x,
             Err(e) => return format!("RESOLVE ERROR: {}", e.render_string()),
         };
 
-        let mut s = String::new();
-        let mut fmt = IndentFormatter::new(&mut s, 4);
-        ResolvePrinter::new(&mut fmt, src, &symbol_table, false)
-            .visit_module(&ast, node)
-            .unwrap();
-
-        s
+        format_symbol_table(src, &ast, &symbol_table, root_node, root_scope, false)
     })
 }

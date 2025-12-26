@@ -38,7 +38,7 @@ pub fn render_line(source: &str, location: Range<usize>, terminal: bool) -> Stri
     for (idx, c) in snippet_str.chars().enumerate() {
         if idx == offset {
             if terminal {
-                write!(buf, "\x1b[30;47m").unwrap()
+                write!(buf, "\x1b[30;46m").unwrap()
             } else {
                 write!(buf, "%").unwrap()
             }

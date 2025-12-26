@@ -117,7 +117,7 @@ fn walk_test_dir(dir: &Path, tests: &mut Vec<TestCase>) {
 #[test]
 fn test_current_file_dir() {
     assert!(
-        dbg!(current_file_path())
+        current_file_path()
             .display()
             .to_string()
             .ends_with("/crates/common/src/test")
@@ -127,7 +127,7 @@ fn test_current_file_dir() {
 #[test]
 fn string_test_test() {
     string_test_runner(&current_file_path().join("string_tests"), |x| {
-        (dbg!(x).parse::<i64>().unwrap() + 1).to_string()
+        (x.parse::<i64>().unwrap() + 1).to_string()
     });
 }
 

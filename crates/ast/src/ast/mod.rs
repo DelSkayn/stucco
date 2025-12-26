@@ -92,6 +92,12 @@ impl<T> Id for NodeListId<T> {
             id: NodeId::from_idx(idx)?,
         })
     }
+
+    fn next(self) -> Option<Self> {
+        Some(Self {
+            id: self.id.next()?,
+        })
+    }
 }
 
 impl<T: Node> NodeListId<T> {

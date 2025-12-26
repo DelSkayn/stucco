@@ -1,10 +1,9 @@
 use std::hash::Hash;
-use std::ops::RangeInclusive;
 use std::u32;
 
 use ast::{Function, Stencil};
 use ast::{NodeId, NodeListId};
-use common::id::PartialIndexMap;
+use common::id::{IdRange, PartialIndexMap};
 use common::{id, id::IndexMap};
 
 pub mod pass;
@@ -79,8 +78,8 @@ pub enum ScopeDeclaration {
 pub struct Scope {
     pub parent: Option<ScopeId>,
     pub declared: ScopeDeclaration,
-    pub children: Option<RangeInclusive<ScopeId>>,
-    pub symbols: Option<RangeInclusive<ScopeSymbolId>>,
+    pub children: Option<IdRange<ScopeId>>,
+    pub symbols: Option<IdRange<ScopeSymbolId>>,
 }
 
 impl Scope {
