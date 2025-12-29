@@ -64,10 +64,26 @@ impl<'slice, 'ast> Parser<'static, 'slice, 'ast> {
 }
 
 impl<'src, 'slice, 'ast> Parser<'src, 'slice, 'ast> {
+    fn token_stream_for_str(s: &'src str) -> ParseResult<'src, TokenStream> {
+        match TokenStream::from_str(s) {
+            Ok(x) => Ok(x),
+            Err(e) => {
+                return Err(Level::Error
+                    .title(format!(
+                        "Failed to lex source, encountered invalid token or unbalanced delimiters"
+                    ))
+                    .snippet(
+                        Snippet::source(s).annotate(AnnotationKind::Primary.span(e.span().into())),
+                    )
+                    .to_diagnostic());
+            }
+        }
+    }
+
     pub fn parse_str<P: Parse<'src> + ast::Node>(
         str: &'src str,
     ) -> ParseResult<'src, (NodeId<P>, Ast)> {
-        let token_stream = TokenStream::from_str(str).unwrap();
+        let token_stream = Self::token_stream_for_str(str)?;
         Parser::parse_inner(Some(str), token_stream, |p| p.parse_push::<P>())
     }
 
@@ -75,7 +91,7 @@ impl<'src, 'slice, 'ast> Parser<'src, 'slice, 'ast> {
         str: &'src str,
         func: F,
     ) -> ParseResult<'src, (F::Result, Ast)> {
-        let token_stream = TokenStream::from_str(str).unwrap();
+        let token_stream = Self::token_stream_for_str(str)?;
         Self::parse_inner(Some(str), token_stream, |p| (func).parse_func(p))
     }
 
@@ -87,7 +103,18 @@ impl<'src, 'slice, 'ast> Parser<'src, 'slice, 'ast> {
     where
         F: FnOnce(&mut Parser<'src, '_, '_>) -> ParseResult<'src, R>,
     {
-        let tb = TokenBuffer::from_stream(stream).unwrap();
+        let tb = match TokenBuffer::from_stream(stream) {
+            Ok(x) => x,
+            Err(e) => {
+                return Err(Level::Error
+                    .title(format!("Failed to lex source, encountered invalid token"))
+                    .snippet(
+                        Snippet::source(source)
+                            .annotate(AnnotationKind::Primary.span(e.span.into())),
+                    )
+                    .to_diagnostic());
+            }
+        };
         let slice = tb.as_slice();
         let mut ast = Ast::new();
         let mut parser = Parser {

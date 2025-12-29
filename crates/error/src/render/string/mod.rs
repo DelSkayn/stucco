@@ -174,7 +174,7 @@ fn render_element(buf: &mut CharBuffer, elem: &Snippet, line_color: Color) {
         };
 
         if end.line == start.line {
-            for _ in 0..(end.column - start.column) {
+            for _ in 0..end.column.saturating_sub(start.column).max(1) {
                 buf.writer().color(underline_color).push_str("^");
             }
             buf.writer().color(underline_color).push_str(" ");

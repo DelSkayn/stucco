@@ -20,7 +20,6 @@ token = { path = "./crates/token", package = "stucco_token" }
 codegen = { path = "./crates/codegen", package = "stucco_codegen" }
 error = { path = "./crates/error", package = "stucco_error" }
 
-anyhow = "1"
 quote = "1.0.36"
 proc-macro2 = "1.0.86"
 hashbrown = {version = "0.14.5"}

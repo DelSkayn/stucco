@@ -18,8 +18,7 @@ parser.workspace = true
 ast.workspace = true
 compiler.workspace = true
 token.workspace = true
-codegen = { workspace = true }
-anyhow.workspace = true
+codegen.workspace = true 
 
 [[bin]]
 name = "stucco_cli"

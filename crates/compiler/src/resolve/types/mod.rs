@@ -10,6 +10,7 @@ use token::{Span, token::Ident};
 
 id!(TypeId);
 id!(TypeTupleId);
+id!(TypeFieldId);
 id!(TypeDeclId);
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
@@ -17,7 +18,7 @@ pub enum Type {
     Struct {
         // Declaration, to make every struct unique.
         decl: TypeDeclId,
-        fields: Option<TypeTupleId>,
+        fields: Option<TypeFieldId>,
     },
     Ptr {
         to: TypeId,
@@ -44,9 +45,26 @@ pub struct TypeDecl {
     declare: Option<NodeId<ast::TypeName>>,
 }
 
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+pub struct TypeTupleEntry {
+    ty: TypeId,
+    next: Option<TypeTupleId>,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+pub struct TypeFieldEntry {
+    name: NodeId<Ident>,
+    ty: TypeId,
+    next: Option<TypeFieldId>,
+}
+
 pub struct TypeTable {
     types: IdSet<TypeId, Type>,
-    type_tuples: IdSet<TypeTupleId, (TypeId, Option<TypeTupleId>)>,
+    type_tuples: IdSet<TypeTupleId, TypeTupleEntry>,
+    type_fields: IdSet<TypeFieldId, TypeFieldEntry>,
+
+    field_name_to_type: HashMap<(TypeDeclId, NodeId<Ident>), TypeId>,
+
     declarations: IndexMap<TypeDeclId, TypeDecl>,
     ast_to_type: PartialIndexMap<NodeId<ast::Type>, TypeId>,
     ast_name_to_type: PartialIndexMap<NodeId<ast::TypeName>, TypeDeclId>,
@@ -64,6 +82,8 @@ impl TypeTable {
         let mut res = TypeTable {
             types: IdSet::new(),
             type_tuples: IdSet::new(),
+            type_fields: IdSet::new(),
+            field_name_to_type: HashMap::new(),
             declarations: IndexMap::new(),
             ast_to_type: PartialIndexMap::new(),
             ast_name_to_type: PartialIndexMap::new(),

@@ -18,16 +18,22 @@ fn mul(a: i32, b: i32) -> i32 {
           sym: [1]Symbol {
             name: [1]Ident{ sym: a, span: 7..8 },
           },
-          ty: [0]Type::Direct([2]Ident{ sym: i32, span: 10..13 }),
+          ty: [0]Type::Name([0]TypeName {
+            name: [2]Ident{ sym: i32, span: 10..13 },
+          }),
         },
         [1]Parameter {
           sym: [2]Symbol {
             name: [3]Ident{ sym: b, span: 15..16 },
           },
-          ty: [1]Type::Direct([2]Ident{ sym: i32, span: 10..13 }),
+          ty: [1]Type::Name([1]TypeName {
+            name: [2]Ident{ sym: i32, span: 10..13 },
+          }),
         },
       ]),
-      output: Some([2]Type::Direct([2]Ident{ sym: i32, span: 10..13 })),
+      output: Some([2]Type::Name([2]TypeName {
+        name: [2]Ident{ sym: i32, span: 10..13 },
+      })),
       body: [3]Expr::Block([0]Block {
         body: Some([
           [2]Expr::Binary([0]BinaryExpr {
@@ -52,16 +58,22 @@ fn mul(a: i32, b: i32) -> i32 {
           sym: [6]Symbol {
             name: [1]Ident{ sym: a, span: 7..8 },
           },
-          ty: [3]Type::Direct([2]Ident{ sym: i32, span: 10..13 }),
+          ty: [3]Type::Name([3]TypeName {
+            name: [2]Ident{ sym: i32, span: 10..13 },
+          }),
         },
         [3]Parameter {
           sym: [7]Symbol {
             name: [3]Ident{ sym: b, span: 15..16 },
           },
-          ty: [4]Type::Direct([2]Ident{ sym: i32, span: 10..13 }),
+          ty: [4]Type::Name([4]TypeName {
+            name: [2]Ident{ sym: i32, span: 10..13 },
+          }),
         },
       ]),
-      output: Some([5]Type::Direct([2]Ident{ sym: i32, span: 10..13 })),
+      output: Some([5]Type::Name([5]TypeName {
+        name: [2]Ident{ sym: i32, span: 10..13 },
+      })),
       body: [7]Expr::Block([1]Block {
         body: Some([
           [6]Expr::Binary([1]BinaryExpr {

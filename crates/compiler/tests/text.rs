@@ -9,7 +9,8 @@ use parser::{Parser, parse_external_module};
 
 use stucco_compiler::{
     resolve::{
-        self, ResolveInfo, SymbolResolvePass, SymbolTable, symbols::print::format_symbol_table,
+        self, ResolveInfo, SymbolResolvePass, SymbolTable, TypeResolvePass, TypeTable,
+        symbols::print::format_symbol_table,
     },
     type_check::Types,
 };
@@ -60,5 +61,23 @@ fn resolve_symbol_text_tests() {
         };
 
         format_symbol_table(src, &ast, &symbol_table, root_node, root_scope, false)
+    })
+}
+
+#[test]
+fn resolve_type_text_tests() {
+    string_test_runner(&current_file_path().join("resolve_type"), |src| {
+        let (root_node, ast) = match Parser::parse_str_func(&src, parse_external_module) {
+            Ok(x) => x,
+            Err(e) => return format!("PARSE ERROR: {}", e.render_string()),
+        };
+
+        let mut type_table = TypeTable::new();
+        match TypeResolvePass::new(src, &mut type_table).pass(&ast, root_node) {
+            Ok(x) => x,
+            Err(e) => return format!("RESOLVE ERROR: {}", e.render_string()),
+        };
+        // TODO: Actually format types
+        String::new()
     })
 }

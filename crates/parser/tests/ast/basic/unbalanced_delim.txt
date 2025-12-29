@@ -1,0 +1,7 @@
+fn foo((){}
+----------
+Error: Failed to lex source, encountered invalid token or unbalanced delimiters
+  |> ???:1:7
+  |
+1 | fn foo((){}
+  |       ^

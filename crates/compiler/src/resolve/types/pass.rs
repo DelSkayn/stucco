@@ -1,7 +1,9 @@
 use ast::{Ast, NodeId, visit::Visit};
 use error::{AnnotationKind, Diagnostic, Level, Snippet};
 
-use crate::resolve::types::{Type, TypeDecl, TypeDeclId, TypeId, TypeTable};
+use crate::resolve::types::{
+    Type, TypeDecl, TypeDeclId, TypeFieldEntry, TypeId, TypeTable, TypeTupleEntry,
+};
 
 pub struct TypeResolvePass<'src, 't> {
     src: &'src str,
@@ -50,7 +52,7 @@ impl<'src, 't> TypeResolvePass<'src, 't> {
         }
 
         let id = self.table.declarations.push_expect(TypeDecl {
-            // Will later be fix to a proper typeid.
+            // Will later be updated to a proper typeid.
             ty: TypeId::MAX,
             declare: Some(name),
         });
@@ -104,7 +106,11 @@ impl<'src, 't> TypeResolvePass<'src, 't> {
                 let mut last = None;
                 for ty in ast.iter_list_node(ast[n].params) {
                     let ty = self.construct_type(ast, ty)?;
-                    last = Some(self.table.type_tuples.push_expect((ty, last)));
+                    last = Some(
+                        self.table
+                            .type_tuples
+                            .push_expect(TypeTupleEntry { ty, next: last }),
+                    );
                 }
 
                 let output = if let Some(x) = ast[n].output {
@@ -171,7 +177,29 @@ impl<'src, 't> Visit for TypeResolvePass<'src, 't> {
         let mut last = None;
         for f in ast.iter_list_node(ast[id].fields) {
             let ty = self.construct_type(ast, ast[f].ty)?;
-            last = Some(self.table.type_tuples.push_expect((ty, last)));
+            let name = ast[f].name;
+            last = Some(self.table.type_fields.push_expect(TypeFieldEntry {
+                name,
+                ty,
+                next: last,
+            }));
+            if self
+                .table
+                .field_name_to_type
+                .insert((ty_decl, name), ty)
+                .is_some()
+            {
+                return Err(Level::Error
+                    .title(format!(
+                        "Conflicting field definition, field `{}` defined twice",
+                        ast[name],
+                    ))
+                    .snippet(
+                        Snippet::source(self.src)
+                            .annotate(AnnotationKind::Primary.span(ast[f].span)),
+                    )
+                    .to_diagnostic());
+            }
         }
 
         let ty = self.table.types.push_expect(Type::Struct {
@@ -193,7 +221,11 @@ impl<'src, 't> Visit for TypeResolvePass<'src, 't> {
         let mut args = None;
         for p in ast.iter_list_node(ast[id].parameters) {
             let ty = self.construct_type(ast, ast[p].ty)?;
-            args = Some(self.table.type_tuples.push_expect((ty, args)))
+            args = Some(
+                self.table
+                    .type_tuples
+                    .push_expect(TypeTupleEntry { ty, next: args }),
+            )
         }
 
         let output = if let Some(x) = ast[id].output {

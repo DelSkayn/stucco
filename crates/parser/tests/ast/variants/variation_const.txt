@@ -17,7 +17,9 @@ stencil foo(a: i64)
           sym: [1]Symbol {
             name: [1]Ident{ sym: a, span: 12..13 },
           },
-          ty: [0]Type::Direct([2]Ident{ sym: i64, span: 15..18 }),
+          ty: [0]Type::Name([0]TypeName {
+            name: [2]Ident{ sym: i64, span: 15..18 },
+          }),
         },
       ]),
       variants: Some([

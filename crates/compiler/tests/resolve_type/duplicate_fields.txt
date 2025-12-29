@@ -1,0 +1,10 @@
+struct F{
+    a: usize,
+    a: usize,
+}
+----------
+RESOLVE ERROR: Error: Conflicting field definition, field with name a defined twice
+  |> ???:3:5
+  |
+3 |     a: usize,
+  |     ^^^^^^^^^
