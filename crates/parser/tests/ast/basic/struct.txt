@@ -6,7 +6,7 @@ struct Data{
 }
 ----------
 [0]Module {
-  sym: Some,
+  definition: None,
   stmts: Some([
     [0]Stmt::Struct([0]Struct {
       public: false,

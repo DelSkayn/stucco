@@ -1,3 +1,5 @@
+mod t();
+
 stencil previous(a: usize)
     variant base:
         imm a,

@@ -103,7 +103,7 @@ where
             x.fmt(fmt)?;
             write!(fmt, ")")
         } else {
-            write!(fmt, "Some")
+            write!(fmt, "None")
         }
     }
 }

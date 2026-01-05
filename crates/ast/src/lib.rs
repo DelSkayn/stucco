@@ -5,10 +5,8 @@ use ast::NodeLibrary;
 pub use ast::{AstSpanned, NodeId, NodeList, NodeListId, PushNodeError};
 pub use ast::{Node, UniqueNode};
 use common::{id::IdSet, u32_vec::U32Vec};
-use token::{
-    Span,
-    token::{Ident, Lit},
-};
+pub use token::token::Lit;
+use token::{Span, token::Ident};
 
 #[cfg(feature = "print")]
 pub use ast::{AstDisplay, AstFormatter, AstRender};
@@ -17,6 +15,7 @@ type LibrarySet<T> = IdSet<u32, T>;
 
 library!(Library {
     module: U32Vec<Module>,
+    module_def: U32Vec<ModuleDefinition>,
 
     stmt: U32Vec<Stmt>,
     stmts: U32Vec<NodeList<Stmt>>,
@@ -331,8 +330,15 @@ ast_struct! {
 ast_struct! {
     pub struct Module {
         // Can be None when the module is reference externally.
-        pub sym: Option<NodeId<Symbol>>,
+        pub definition: Option<NodeId<ModuleDefinition>>,
         pub stmts: Option<NodeListId<Stmt>>,
+    }
+}
+
+ast_struct! {
+    pub struct ModuleDefinition{
+        pub name: NodeId<Symbol>,
+        pub ty: NodeId<TypeFn>,
     }
 }
 
@@ -341,6 +347,7 @@ ast_enum! {
         Stencil(NodeId<Stencil>),
         Struct(NodeId<Struct>),
         Function(NodeId<Function>),
+        Definition(NodeId<ModuleDefinition>),
     }
 }
 

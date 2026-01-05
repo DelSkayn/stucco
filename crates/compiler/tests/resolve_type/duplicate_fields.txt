@@ -1,10 +1,12 @@
+mod t();
+
 struct F{
     a: usize,
     a: usize,
 }
 ----------
-RESOLVE ERROR: Error: Conflicting field definition, field with name a defined twice
-  |> ???:3:5
+RESOLVE ERROR: Error: Conflicting field definition, field `a` defined twice
+  |> ???:5:5
   |
-3 |     a: usize,
+5 |     a: usize,
   |     ^^^^^^^^^

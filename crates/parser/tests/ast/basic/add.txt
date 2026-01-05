@@ -3,15 +3,15 @@ stencil foo(){
 }
 ----------
 [0]Module {
-  sym: Some,
+  definition: None,
   stmts: Some([
     [0]Stmt::Stencil([0]Stencil {
       sym: [0]Symbol {
         name: [0]Ident{ sym: foo, span: 8..11 },
       },
-      parameters: Some,
-      variants: Some,
-      output: Some,
+      parameters: None,
+      variants: None,
+      output: None,
       body: [4]Expr::Block([0]Block {
         body: Some([
           [3]Expr::Return([0]Return {

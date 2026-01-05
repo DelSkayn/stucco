@@ -1,6 +1,6 @@
 pub mod pass;
 
-use ast::NodeId;
+use ast::{Ast, NodeId};
 use common::{
     id,
     id::{IdSet, IndexMap, PartialIndexMap},
@@ -59,25 +59,31 @@ pub struct TypeFieldEntry {
 }
 
 pub struct TypeTable {
-    types: IdSet<TypeId, Type>,
-    type_tuples: IdSet<TypeTupleId, TypeTupleEntry>,
-    type_fields: IdSet<TypeFieldId, TypeFieldEntry>,
+    pub types: IdSet<TypeId, Type>,
+    pub type_tuples: IdSet<TypeTupleId, TypeTupleEntry>,
+    pub type_fields: IdSet<TypeFieldId, TypeFieldEntry>,
 
-    field_name_to_type: HashMap<(TypeDeclId, NodeId<Ident>), TypeId>,
+    pub field_name_to_type: HashMap<(TypeDeclId, NodeId<Ident>), TypeId>,
 
-    declarations: IndexMap<TypeDeclId, TypeDecl>,
-    ast_to_type: PartialIndexMap<NodeId<ast::Type>, TypeId>,
-    ast_name_to_type: PartialIndexMap<NodeId<ast::TypeName>, TypeDeclId>,
-    ast_fn_to_type: PartialIndexMap<NodeId<ast::Function>, TypeId>,
-    name_to_type: HashMap<NodeId<Ident>, TypeDeclId>,
-    predefined: HashMap<Ident, TypeDeclId>,
+    pub declarations: IndexMap<TypeDeclId, TypeDecl>,
+    pub ast_to_type: PartialIndexMap<NodeId<ast::Type>, TypeId>,
+    pub ast_name_to_type: PartialIndexMap<NodeId<ast::TypeName>, TypeDeclId>,
+    pub ast_fn_to_type: PartialIndexMap<NodeId<ast::Function>, TypeId>,
+    pub name_to_type: HashMap<NodeId<Ident>, TypeDeclId>,
+    pub predefined: HashMap<Ident, TypeDeclId>,
+    pub definition: Option<(NodeId<ast::ModuleDefinition>, TypeId)>,
+
+    pub expr_to_ty: IndexMap<NodeId<ast::Expr>, TypeId>,
+}
+
+impl TypeId {
+    pub const NIL: TypeId = unsafe { TypeId::from_u32_unchecked(0) };
+    pub const NEVER: TypeId = unsafe { TypeId::from_u32_unchecked(1) };
+    pub const BOOL: TypeId = unsafe { TypeId::from_u32_unchecked(2) };
+    pub const U64: TypeId = unsafe { TypeId::from_u32_unchecked(3) };
 }
 
 impl TypeTable {
-    pub const NIL_ID: TypeId = unsafe { TypeId::from_u32_unchecked(0) };
-    pub const NEVER_ID: TypeId = unsafe { TypeId::from_u32_unchecked(1) };
-    pub const BOOL_ID: TypeId = unsafe { TypeId::from_u32_unchecked(2) };
-
     pub fn new() -> Self {
         let mut res = TypeTable {
             types: IdSet::new(),
@@ -90,13 +96,16 @@ impl TypeTable {
             ast_fn_to_type: PartialIndexMap::new(),
             name_to_type: HashMap::new(),
             predefined: HashMap::new(),
+            definition: None,
+
+            expr_to_ty: IndexMap::new(),
         };
 
-        assert_eq!(res.types.push_expect(Type::Nil), Self::NIL_ID);
-        assert_eq!(res.types.push_expect(Type::Never), Self::NEVER_ID);
-        assert_eq!(res.insert_predefined("bool", Type::Bool), Self::BOOL_ID);
-        res.insert_predefined("usize", Type::Usize);
-        res.insert_predefined("u64", Type::U64);
+        assert_eq!(res.types.push_expect(Type::Nil), TypeId::NIL);
+        assert_eq!(res.types.push_expect(Type::Never), TypeId::NEVER);
+        assert_eq!(res.insert_predefined("bool", Type::Bool), TypeId::BOOL);
+        assert_eq!(res.insert_predefined("u64", Type::U64), TypeId::U64);
+        //res.insert_predefined("usize", Type::Usize);
 
         res
     }
@@ -109,5 +118,74 @@ impl TypeTable {
         self.predefined
             .insert(Ident::new(name, Span::call_site().into()), decl);
         ty
+    }
+
+    pub fn coerces_to(&self, from: TypeId, _to: TypeId) -> bool {
+        if from == TypeId::NEVER {
+            return true;
+        }
+
+        false
+    }
+
+    pub fn format_type(&self, ast: &Ast, ty: TypeId) -> String {
+        let mut res = String::new();
+        self.format_type_inner(ast, ty, &mut res);
+        res
+    }
+
+    fn format_type_inner(&self, ast: &Ast, ty: TypeId, res: &mut String) {
+        use std::fmt::Write;
+
+        match self.types[ty] {
+            Type::Struct { decl, .. } => {
+                if let Some(x) = self.declarations[decl].declare {
+                    let _ = write!(res, "{}", x.index(ast).name.index(ast));
+                } else {
+                    todo!()
+                }
+            }
+            Type::Ptr { to } => {
+                res.push_str("*const ");
+                self.format_type_inner(ast, to, res);
+            }
+            Type::PtrMut { to } => {
+                res.push_str("*mut ");
+                self.format_type_inner(ast, to, res);
+            }
+            Type::Usize => res.push_str("usize"),
+            Type::U64 => res.push_str("u64"),
+            Type::Bool => res.push_str("bool"),
+            Type::Nil => res.push_str("()"),
+            Type::Never => res.push('!'),
+            Type::Fn { args, output } => {
+                res.push_str("fn(");
+                let mut cur = args;
+                let mut buffer = Vec::new();
+                while let Some(c) = cur {
+                    buffer.push(self.type_tuples[c].ty);
+                    cur = self.type_tuples[c].next;
+                }
+
+                for (idx, arg) in buffer.into_iter().rev().enumerate() {
+                    if idx != 0 {
+                        res.push(',')
+                    }
+                    self.format_type_inner(ast, arg, res);
+                }
+                res.push(')');
+                if output != TypeId::NIL {
+                    res.push_str(" -> ");
+                    self.format_type_inner(ast, output, res);
+                }
+            }
+            Type::Decl { decl } => {
+                if let Some(x) = self.declarations[decl].declare {
+                    let _ = write!(res, "{}", x.index(ast).name.index(ast));
+                } else {
+                    todo!()
+                }
+            }
+        }
     }
 }

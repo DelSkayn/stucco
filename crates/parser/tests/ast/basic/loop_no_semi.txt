@@ -6,22 +6,22 @@ stencil foo(){
 }
 ----------
 [0]Module {
-  sym: Some,
+  definition: None,
   stmts: Some([
     [0]Stmt::Stencil([0]Stencil {
       sym: [0]Symbol {
         name: [0]Ident{ sym: foo, span: 8..11 },
       },
-      parameters: Some,
-      variants: Some,
-      output: Some,
+      parameters: None,
+      variants: None,
+      output: None,
       body: [5]Expr::Block([1]Block {
         body: Some([
           [1]Expr::Loop([0]Loop {
             body: [0]Block {
               body: Some([
                 [0]Expr::Break([0]Break {
-                  expr: Some,
+                  expr: None,
                 }),
               ]),
               returns_last: true,

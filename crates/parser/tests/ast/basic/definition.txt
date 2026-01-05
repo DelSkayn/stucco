@@ -1,0 +1,20 @@
+mod foo(usize) -> usize;
+----------
+[0]Module {
+  definition: None,
+  stmts: Some([
+    [0]Stmt::Definition([0]ModuleDefinition {
+      name: [0]Symbol {
+        name: [0]Ident{ sym: foo, span: 4..7 },
+      },
+      args: Some([
+        [0]Type::Name([0]TypeName {
+          name: [1]Ident{ sym: usize, span: 8..13 },
+        }),
+      ]),
+      output: Some([1]Type::Name([1]TypeName {
+        name: [1]Ident{ sym: usize, span: 8..13 },
+      })),
+    }),
+  ]),
+}

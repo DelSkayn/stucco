@@ -1,5 +1,6 @@
 use ast::{Ast, NodeId, visit::Visit};
 use error::{AnnotationKind, Diagnostic, Level, Snippet};
+use token::Span;
 
 use crate::resolve::types::{
     Type, TypeDecl, TypeDeclId, TypeFieldEntry, TypeId, TypeTable, TypeTupleEntry,
@@ -12,6 +13,10 @@ pub struct TypeResolvePass<'src, 't> {
 
 impl<'src, 't> TypeResolvePass<'src, 't> {
     pub fn new(src: &'src str, table: &'t mut TypeTable) -> Self {
+        assert!(
+            table.definition.is_none(),
+            "Type table already used in a resolve pass"
+        );
         TypeResolvePass { src, table }
     }
 
@@ -65,7 +70,7 @@ impl<'src, 't> TypeResolvePass<'src, 't> {
     pub fn pass(mut self, ast: &Ast, root: NodeId<ast::Module>) -> Result<(), Diagnostic<'src>> {
         for stmt in ast.iter_list_node(ast[root].stmts) {
             match ast[stmt] {
-                ast::Stmt::Stencil(_) | ast::Stmt::Function(_) => {}
+                ast::Stmt::Stencil(_) | ast::Stmt::Function(_) | ast::Stmt::Definition(_) => {}
                 ast::Stmt::Struct(n) => self.declare_type(ast, ast[n].name)?,
             }
         }
@@ -95,34 +100,41 @@ impl<'src, 't> TypeResolvePass<'src, 't> {
             .to_diagnostic())
     }
 
+    pub fn construct_type_fn(
+        &mut self,
+        ast: &Ast,
+        id: NodeId<ast::TypeFn>,
+    ) -> Result<TypeId, Diagnostic<'src>> {
+        // HACK: Pushing types in reverse order for now.
+        let mut last = None;
+        for ty in ast.iter_list_node(ast[id].params) {
+            let ty = self.construct_type(ast, ty)?;
+            last = Some(
+                self.table
+                    .type_tuples
+                    .push_expect(TypeTupleEntry { ty, next: last }),
+            );
+        }
+
+        let output = if let Some(x) = ast[id].output {
+            self.construct_type(ast, x)?
+        } else {
+            TypeTable::NIL_ID
+        };
+
+        Ok(self
+            .table
+            .types
+            .push_expect(Type::Fn { args: last, output }))
+    }
+
     pub fn construct_type(
         &mut self,
         ast: &Ast,
         id: NodeId<ast::Type>,
     ) -> Result<TypeId, Diagnostic<'src>> {
         let ty = match ast[id] {
-            ast::Type::Fn(n) => {
-                // HACK: Pushing types in reverse order for now.
-                let mut last = None;
-                for ty in ast.iter_list_node(ast[n].params) {
-                    let ty = self.construct_type(ast, ty)?;
-                    last = Some(
-                        self.table
-                            .type_tuples
-                            .push_expect(TypeTupleEntry { ty, next: last }),
-                    );
-                }
-
-                let output = if let Some(x) = ast[n].output {
-                    self.construct_type(ast, x)?
-                } else {
-                    TypeTable::NIL_ID
-                };
-
-                self.table
-                    .types
-                    .push_expect(Type::Fn { args: last, output })
-            }
+            ast::Type::Fn(n) => self.construct_type_fn(ast, n)?,
             ast::Type::Ptr(n) => {
                 let ty = self.construct_type(ast, ast[n].ty)?;
                 let ty = if ast[n].mutable {
@@ -165,6 +177,58 @@ impl<'src, 't> TypeResolvePass<'src, 't> {
 
 impl<'src, 't> Visit for TypeResolvePass<'src, 't> {
     type Error = Diagnostic<'src>;
+
+    fn visit_module(&mut self, ast: &Ast, id: NodeId<ast::Module>) -> Result<(), Self::Error> {
+        if let Some(x) = ast[id].definition {
+            let ty = self.construct_type_fn(ast, ast[x].ty)?;
+            self.table.definition = Some((x, ty));
+        }
+
+        ast::visit::visit_module(self, ast, id)?;
+
+        if self.table.definition.is_none() {
+            return Err(Level::Error
+                .title("Missing `mod name fn(Arg1,Arg2) -> Res;` module definition")
+                .snippet(Snippet::source(self.src).annotate(
+                    AnnotationKind::Primary.span(Span::call_site()).label(
+                        "All stucco modules must define the type of the function to be constructed",
+                    ),
+                ))
+                .to_diagnostic());
+        }
+
+        Ok(())
+    }
+
+    fn visit_module_definition(
+        &mut self,
+        ast: &Ast,
+        id: NodeId<ast::ModuleDefinition>,
+    ) -> Result<(), Self::Error> {
+        if let Some(x) = self.table.definition {
+            return Err(Level::Error
+                .title("Module defined more then once.")
+                .snippet(
+                    Snippet::source(self.src)
+                        .annotate(
+                            AnnotationKind::Primary
+                                .span(ast[x.0].span)
+                                .label("Second definition found here"),
+                        )
+                        .annotate(
+                            AnnotationKind::Context
+                                .span(ast[x.0].span)
+                                .label("First definition found here"),
+                        ),
+                )
+                .to_diagnostic());
+        }
+
+        let ty = self.construct_type_fn(ast, ast[id].ty)?;
+        self.table.definition = Some((id, ty));
+
+        Ok(())
+    }
 
     fn visit_type_name(&mut self, ast: &Ast, id: NodeId<ast::TypeName>) -> Result<(), Self::Error> {
         self.use_type_name(ast, id)?;

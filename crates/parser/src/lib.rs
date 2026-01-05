@@ -229,7 +229,6 @@ impl<'src, 'slice, 'ast> Parser<'src, 'slice, 'ast> {
         F: FnOnce(&mut Parser<'src, '_, '_>, Span) -> ParseResult<'src, R>,
     {
         let Some((group, slice)) = self.slice.group() else {
-            println!("{}", std::backtrace::Backtrace::force_capture());
             let delim = match delim {
                 Delimiter::Parenthesis => "(",
                 Delimiter::Brace => "{",
@@ -387,8 +386,7 @@ impl DerefMut for Parser<'_, '_, '_> {
 pub fn parse_wrapped_module<'src>(
     parser: &mut Parser<'src, '_, '_>,
 ) -> ParseResult<'src, NodeId<ast::Module>> {
-    let span = parser.expect::<T![mod]>()?.0;
-    let sym = parser.parse_push()?;
+    let def = parser.parse_push::<ast::ModuleDefinition>()?;
 
     let functions = parser.parse_braced(|parser, _| {
         let mut head = None;
@@ -404,10 +402,10 @@ pub fn parse_wrapped_module<'src>(
         Ok(head)
     })?;
 
-    let span = parser.span_since(span);
+    let span = parser.span_since(parser[def].span);
 
     parser.push(ast::Module {
-        sym: Some(sym),
+        definition: Some(def),
         stmts: functions,
         span,
     })
@@ -438,7 +436,7 @@ pub fn parse_external_module<'src>(
     };
 
     parser.push(ast::Module {
-        sym: None,
+        definition: None,
         stmts: head,
         span,
     })

@@ -6,7 +6,7 @@ stencil foo(a: i64)
 }
 ----------
 [0]Module {
-  sym: Some,
+  definition: None,
   stmts: Some([
     [0]Stmt::Stencil([0]Stencil {
       sym: [0]Symbol {
@@ -35,7 +35,7 @@ stencil foo(a: i64)
           ]),
         },
       ]),
-      output: Some,
+      output: None,
       body: [5]Expr::Block([0]Block {
         body: Some([
           [4]Expr::Return([0]Return {

@@ -1,8 +1,8 @@
 use crate::{
     Become, BinaryExpr, Block, Break, Call, Cast, Expr, Field, FieldExpr, Function, If, Index, Let,
-    Loop, Method, Module, NodeId, NodeListId, Parameter, Return, Span, Stencil, Stmt, Struct,
-    Symbol, Type, TypeArray, TypeFn, TypeName, TypePtr, TypeReference, TypeTuple, UnaryExpr,
-    Variant, Variation, VariationConst, VariationImmediate, VariationSlot, While,
+    Loop, Method, Module, ModuleDefinition, NodeId, NodeListId, Parameter, Return, Span, Stencil,
+    Stmt, Struct, Symbol, Type, TypeArray, TypeFn, TypeName, TypePtr, TypeReference, TypeTuple,
+    UnaryExpr, Variant, Variation, VariationConst, VariationImmediate, VariationSlot, While,
 };
 use token::token::{Ident, Lit};
 
@@ -54,11 +54,19 @@ implement_visitor! {
         Ok(())
     }
 
+    fn visit_module_definition(visit, ast, m: NodeId<ModuleDefinition>){
+
+        visit.visit_type_fn(ast, ast[m].ty)?;
+
+        Ok(())
+    }
+
     fn visit_stmt(visit, ast, m: NodeId<Stmt>) {
         match ast[m]{
             Stmt::Stencil(x) =>visit.visit_stencil(ast,x),
             Stmt::Struct(s) => visit.visit_struct(ast, s),
             Stmt::Function(f) => visit.visit_function(ast,f),
+            Stmt::Definition(f) => visit.visit_module_definition(ast,f),
         }
     }
 

@@ -7,7 +7,7 @@ fn mul(a: i32, b: i32) -> i32 {
 }
 ----------
 [0]Module {
-  sym: Some,
+  definition: None,
   stmts: Some([
     [0]Stmt::Function([0]Function {
       sym: [0]Symbol {

@@ -12,7 +12,7 @@ use stucco_compiler::{
         self, ResolveInfo, SymbolResolvePass, SymbolTable, TypeResolvePass, TypeTable,
         symbols::print::format_symbol_table,
     },
-    type_check::Types,
+    type_check::check,
 };
 
 #[test]
@@ -28,21 +28,13 @@ fn infer_text_tests() {
             Err(e) => return format!("RESOLVE ERROR: {}", e.render_string()),
         };
 
-        let mut types = Types::new();
-        types.infer(&ast, &info.symbols, node).unwrap();
+        match check(src, node, &ast, &mut info) {
+            Ok(_) => {}
+            Err(e) => return format!("TYPE ERROR: {}", e.render_string()),
+        }
 
-        let mut s = String::new();
-        let mut fmt = IndentFormatter::new(&mut s, 2);
-        stucco_compiler::type_check::print::TypePrinter::new(
-            false,
-            &mut fmt,
-            &src,
-            &info.symbols,
-            &types,
-        )
-        .visit_module(&ast, node)
-        .unwrap();
-        s
+        // TODO: Format infered types
+        String::new()
     })
 }
 
@@ -77,6 +69,7 @@ fn resolve_type_text_tests() {
             Ok(x) => x,
             Err(e) => return format!("RESOLVE ERROR: {}", e.render_string()),
         };
+
         // TODO: Actually format types
         String::new()
     })

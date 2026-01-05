@@ -1,7 +1,9 @@
+mod t();
+
 fn foo(a: B){}
 ----------
 RESOLVE ERROR: Error: Use of undeclared type `B`
-  |> ???:1:11
+  |> ???:3:11
   |
-1 | fn foo(a: B){}
+3 | fn foo(a: B){}
   |           ^
