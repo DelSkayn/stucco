@@ -141,6 +141,7 @@ impl<I: Id, T> IndexMap<I, Option<T>> {
     /// Returns the entry for the given index assuming it is filled.
     /// Meaning it is both inserted and not `None`
     #[inline]
+    #[track_caller]
     pub fn get_filled(&self, i: I) -> &T {
         self[i].as_ref().unwrap()
     }
@@ -148,6 +149,7 @@ impl<I: Id, T> IndexMap<I, Option<T>> {
     /// Returns the entry for the given index assuming it is filled.
     /// Meaning it is both inserted and not `None`
     #[inline]
+    #[track_caller]
     pub fn get_filled_mut(&mut self, i: I) -> &mut T {
         self[i].as_mut().unwrap()
     }

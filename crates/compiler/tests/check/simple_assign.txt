@@ -1,0 +1,12 @@
+mod t() -> u64;
+
+stencil previous(a: u64)
+    variant base:
+        imm a,
+{
+    let b = a;
+    return b;
+}
+/************
+*/
+

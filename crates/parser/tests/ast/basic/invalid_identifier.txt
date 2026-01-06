@@ -1,5 +1,5 @@
 123abc
-----------
+/************
 Error: Failed to lex source, encountered invalid token
   |> ???:1:1
   |

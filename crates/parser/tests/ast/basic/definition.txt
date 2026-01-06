@@ -1,5 +1,5 @@
 mod foo(usize) -> usize;
-----------
+/************
 [0]Module {
   definition: None,
   stmts: Some([

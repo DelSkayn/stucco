@@ -8,7 +8,7 @@ stencil add(a: usize, b: usize)
 {
     become next(a + b);
 }
-----------
+/************
 DECLARED:
     module{
         [0] = add @ 'stencil %add%(a: usize, b: usize)'

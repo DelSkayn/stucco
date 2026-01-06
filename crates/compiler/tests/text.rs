@@ -16,8 +16,8 @@ use stucco_compiler::{
 };
 
 #[test]
-fn infer_text_tests() {
-    string_test_runner(&current_file_path().join("infer"), |src| {
+fn check_text_tests() {
+    string_test_runner(&current_file_path().join("check"), |src| {
         let (node, ast) = match Parser::parse_str_func(&src, parse_external_module) {
             Ok(x) => x,
             Err(e) => return format!("PARSE ERROR: {}", e.render_string()),

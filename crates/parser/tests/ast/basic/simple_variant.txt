@@ -3,7 +3,7 @@ stencil foo(a: i64)
         imm a
 {
 }
-----------
+/************
 [0]Module {
   definition: None,
   stmts: Some([

@@ -231,8 +231,13 @@ implement_visitor! {
     }
 
     fn visit_let(visit, ast, e: NodeId<Let>)  {
-        visit.visit_symbol(ast, ast[e].sym)?;
         visit.visit_expr(ast, ast[e].expr)?;
+
+        if let Some(x) = ast[e].ty{
+            visit.visit_type(ast, x)?;
+        }
+
+        visit.visit_symbol(ast, ast[e].sym)?;
         Ok(())
     }
 

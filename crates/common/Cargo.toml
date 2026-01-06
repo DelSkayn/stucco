@@ -9,5 +9,5 @@ test = []
 [dependencies]
 hashbrown = { workspace = true, features = ["raw"]}
 
-[dev-depencies]
+[dev-dependencies]
 common = { workspace = true, features = ["test"] }

@@ -1,0 +1,11 @@
+mod t();
+
+fn i(){
+    let a: u64 = true;
+}
+/************
+TYPE ERROR: Error: Cannot coerce type `bool` to `u64`
+  |> ???:4:18
+  |
+4 |     let a: u64 = true;
+  |                  ^^^^

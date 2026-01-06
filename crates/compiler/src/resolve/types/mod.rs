@@ -8,6 +8,8 @@ use common::{
 use std::collections::HashMap;
 use token::{Span, token::Ident};
 
+use crate::resolve::SymbolId;
+
 id!(TypeId);
 id!(TypeTupleId);
 id!(TypeFieldId);
@@ -29,7 +31,9 @@ pub enum Type {
     Usize,
     U64,
     Bool,
+    /// Result a statement with a semicolon.
     Nil,
+    /// Result of a diverging operation.
     Never,
     Fn {
         args: Option<TypeTupleId>,
@@ -38,6 +42,9 @@ pub enum Type {
     Decl {
         decl: TypeDeclId,
     },
+    // Not a real type used for when the type result of an expression is ignored.
+    // All types coerce to ignored.
+    Ignore,
 }
 
 pub struct TypeDecl {
@@ -73,14 +80,17 @@ pub struct TypeTable {
     pub predefined: HashMap<Ident, TypeDeclId>,
     pub definition: Option<(NodeId<ast::ModuleDefinition>, TypeId)>,
 
-    pub expr_to_ty: IndexMap<NodeId<ast::Expr>, TypeId>,
+    // Set in the type_check pass.
+    pub expr_to_ty: PartialIndexMap<NodeId<ast::Expr>, TypeId>,
+    pub symbol_to_ty: PartialIndexMap<SymbolId, TypeId>,
 }
 
 impl TypeId {
     pub const NIL: TypeId = unsafe { TypeId::from_u32_unchecked(0) };
     pub const NEVER: TypeId = unsafe { TypeId::from_u32_unchecked(1) };
-    pub const BOOL: TypeId = unsafe { TypeId::from_u32_unchecked(2) };
-    pub const U64: TypeId = unsafe { TypeId::from_u32_unchecked(3) };
+    pub const IGNORE: TypeId = unsafe { TypeId::from_u32_unchecked(2) };
+    pub const BOOL: TypeId = unsafe { TypeId::from_u32_unchecked(3) };
+    pub const U64: TypeId = unsafe { TypeId::from_u32_unchecked(4) };
 }
 
 impl TypeTable {
@@ -98,11 +108,13 @@ impl TypeTable {
             predefined: HashMap::new(),
             definition: None,
 
-            expr_to_ty: IndexMap::new(),
+            expr_to_ty: PartialIndexMap::new(),
+            symbol_to_ty: PartialIndexMap::new(),
         };
 
         assert_eq!(res.types.push_expect(Type::Nil), TypeId::NIL);
         assert_eq!(res.types.push_expect(Type::Never), TypeId::NEVER);
+        assert_eq!(res.types.push_expect(Type::Ignore), TypeId::IGNORE);
         assert_eq!(res.insert_predefined("bool", Type::Bool), TypeId::BOOL);
         assert_eq!(res.insert_predefined("u64", Type::U64), TypeId::U64);
         //res.insert_predefined("usize", Type::Usize);
@@ -120,12 +132,16 @@ impl TypeTable {
         ty
     }
 
-    pub fn coerces_to(&self, from: TypeId, _to: TypeId) -> bool {
+    pub fn coerces_to(&self, from: TypeId, to: TypeId) -> bool {
         if from == TypeId::NEVER {
             return true;
         }
 
-        false
+        if to == TypeId::IGNORE {
+            return true;
+        }
+
+        from == to
     }
 
     pub fn format_type(&self, ast: &Ast, ty: TypeId) -> String {
@@ -185,6 +201,9 @@ impl TypeTable {
                 } else {
                     todo!()
                 }
+            }
+            Type::Ignore => {
+                res.push_str("#IGNORE, NOT A REAL TYPE#");
             }
         }
     }

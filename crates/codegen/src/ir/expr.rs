@@ -1,7 +1,6 @@
 use super::VariantGen;
 use crate::{NumberType, value::Value};
 use ast::NodeId;
-use compiler::type_check::{PrimTy, Ty};
 use inkwell::{
     IntPredicate,
     llvm_sys::{LLVMCallConv, LLVMTailCallKind},

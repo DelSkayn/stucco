@@ -1,0 +1,12 @@
+mod t();
+
+stencil i(){
+    return true;
+}
+/************
+TYPE ERROR: Error: Cannot coerce type `bool` to `()`
+  |> ???:4:12
+  |
+4 |     return true;
+  |            ^^^^
+*/

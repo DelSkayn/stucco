@@ -4,7 +4,7 @@ struct Data{
     boolean: bool,
     ptr: *mut i64,
 }
-----------
+/************
 [0]Module {
   definition: None,
   stmts: Some([

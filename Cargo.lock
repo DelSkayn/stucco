@@ -251,6 +251,7 @@ name = "stucco_common"
 version = "0.1.0"
 dependencies = [
  "hashbrown",
+ "stucco_common",
 ]
 
 [[package]]

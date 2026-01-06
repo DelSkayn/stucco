@@ -4,7 +4,7 @@ stencil foo(){
     }
     1 + 1;
 }
-----------
+/************
 [0]Module {
   definition: None,
   stmts: Some([

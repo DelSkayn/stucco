@@ -5,7 +5,7 @@ fn test(a: i32, b: i32) -> i32{
 fn mul(a: i32, b: i32) -> i32{
     a * b
 }
-----------
+/************
 DECLARED:
     module{
         [0] = test @ 'fn %test%(a: i32, b: i32) -> i32{'

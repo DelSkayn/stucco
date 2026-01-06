@@ -1,0 +1,13 @@
+mod t();
+
+fn i(a: u64){
+    if a {
+    }
+}
+/************
+TYPE ERROR: Error: Cannot coerce type `u64` to `bool`
+  |> ???:4:8
+  |
+4 |     if a {
+  |        ^
+*/

@@ -117,6 +117,8 @@ impl_keywords! {
     while => While,
     mod => Mod,
     as => As,
+    true => True,
+    false => False,
 }
 
 macro_rules! impl_punct{

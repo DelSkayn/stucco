@@ -3,7 +3,7 @@ fn foo(){
   let a = 2;
   a + 1;
 }
-----------
+/************
 DECLARED:
     module{
         [0] = foo @ 'fn %foo%(){'

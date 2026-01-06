@@ -119,7 +119,7 @@ impl<'src, 't> TypeResolvePass<'src, 't> {
         let output = if let Some(x) = ast[id].output {
             self.construct_type(ast, x)?
         } else {
-            TypeTable::NIL_ID
+            TypeId::NIL
         };
 
         Ok(self
@@ -295,11 +295,23 @@ impl<'src, 't> Visit for TypeResolvePass<'src, 't> {
         let output = if let Some(x) = ast[id].output {
             self.construct_type(ast, x)?
         } else {
-            TypeTable::NIL_ID
+            TypeId::NIL
         };
 
         let ty_id = self.table.types.push_expect(Type::Fn { args, output });
         self.table.ast_fn_to_type.insert_fill(id, ty_id);
+
+        self.visit_expr(ast, ast[id].body)?;
+
+        Ok(())
+    }
+
+    fn visit_stencil(&mut self, ast: &Ast, id: NodeId<ast::Stencil>) -> Result<(), Self::Error> {
+        for p in ast.iter_list_node(ast[id].parameters) {
+            self.construct_type(ast, ast[p].ty)?;
+        }
+
+        self.visit_expr(ast, ast[id].body)?;
 
         Ok(())
     }

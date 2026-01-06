@@ -4,7 +4,7 @@ stencil foo(a: i64)
 {
     return 1 + a
 }
-----------
+/************
 [0]Module {
   definition: None,
   stmts: Some([

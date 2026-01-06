@@ -1,0 +1,11 @@
+mod t();
+
+fn i(){
+    let a = true + 1;
+}
+/************
+TYPE ERROR: Error: Type inference not yet implemented, crates/compiler/src/type_check/mod.rs:293:48
+  |> ???:4:18
+  |
+4 |     let a = true + 1;
+  |                  ^

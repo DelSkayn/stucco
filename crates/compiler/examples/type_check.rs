@@ -1,5 +1,3 @@
-use ast::{AstSpanned as _, visit::Visit};
-use common::render::{self, IndentFormatter};
 use parser::{Parser, parse_external_module};
 use std::{
     env,
@@ -8,9 +6,8 @@ use std::{
 };
 use stucco_compiler::{
     resolve::{ResolveInfo, resolve},
-    type_check::{TypeError, Types, print::TypePrinter},
+    type_check::check,
 };
-use token::Spanned as _;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let src = if let Some(arg) = env::args().skip(1).next() {
@@ -42,47 +39,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
-    let mut types = Types::new();
-    match types.infer(&ast, &info.symbols, node) {
-        Ok(()) => println!(
-            "{}",
-            render::render(|fmt| {
-                let mut fmt = IndentFormatter::new(fmt, 2);
-                TypePrinter::new(true, &mut fmt, &src, &info.symbols, &types)
-                    .visit_module(&ast, node)
-            })
-        ),
+    match check(&src, node, &ast, &mut info) {
+        Ok(_) => {
+            todo!()
+        }
         Err(e) => {
-            match e {
-                TypeError::Mismatch(a, b) => {
-                    eprintln!(
-                        "Unexpected type {}, expected {}",
-                        types.type_to_string(&ast, a),
-                        types.type_to_string(&ast, b)
-                    )
-                }
-                TypeError::LiteralOverflow(lit, ty) => {
-                    eprintln!(
-                        "Can't fit '{:?}' in type {}",
-                        ast[lit].span().source_text(),
-                        types.type_to_string(&ast, ty)
-                    )
-                }
-                TypeError::UnknownMethod(lit, ty) => {
-                    eprintln!(
-                        "unknown method '{:?}' for type {}",
-                        ast[lit].span().source_text(),
-                        types.type_to_string(&ast, ty)
-                    )
-                }
-                TypeError::UnknownType(ty, _) => {
-                    eprintln!("unknown type '{:?}'", ast[ty].ast_span(&ast).source_text(),)
-                }
-                _ => {}
-            }
-            eprintln!("ERROR: {:?}", e);
+            let mut w = std::io::stderr().lock();
+            e.render_char_buffer().write_styled(&mut w)?;
+            writeln!(&mut w)?;
         }
     }
-
     Ok(())
 }

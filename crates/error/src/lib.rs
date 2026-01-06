@@ -4,6 +4,7 @@ use std::borrow::Cow;
 
 use token::Span;
 
+#[derive(Debug)]
 pub enum OptionCow<'a> {
     None,
     Owned(String),
@@ -51,6 +52,7 @@ impl<'a> OptionCow<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct Diagnostic<'a> {
     groups: Vec<Group<'a>>,
 }
@@ -63,6 +65,7 @@ impl<'a> Diagnostic<'a> {
     }
 }
 
+#[derive(Debug)]
 pub enum Level {
     Error,
     Warning,
@@ -81,6 +84,7 @@ impl Level {
     }
 }
 
+#[derive(Debug)]
 pub struct Group<'a> {
     level: Level,
     title: Cow<'a, str>,
@@ -106,6 +110,7 @@ impl<'a> Group<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct Snippet<'a> {
     origin: OptionCow<'a>,
     source: OptionCow<'a>,
@@ -162,6 +167,7 @@ impl AnnotationKind {
     }
 }
 
+#[derive(Debug)]
 pub struct Annotation<'a> {
     kind: AnnotationKind,
     span: Span,

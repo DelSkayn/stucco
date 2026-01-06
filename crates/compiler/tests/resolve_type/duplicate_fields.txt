@@ -1,12 +1,12 @@
 mod t();
 
 struct F{
-    a: usize,
-    a: usize,
+    a: u64,
+    a: u64,
 }
-----------
+/************
 RESOLVE ERROR: Error: Conflicting field definition, field `a` defined twice
   |> ???:5:5
   |
-5 |     a: usize,
-  |     ^^^^^^^^^
+5 |     a: u64,
+  |     ^^^^^^^

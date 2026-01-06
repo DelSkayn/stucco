@@ -1,0 +1,16 @@
+mod t();
+
+stencil previous(stack: u64, count: u64)
+    variant base:
+        imm count,
+        slot stack,
+{
+    let stack = (stack as *mut u64).sub(count);
+    become next(stack as u64);
+}
+/************
+TYPE ERROR: Error: Type inference not yet implemented, crates/compiler/src/type_check/mod.rs:305:48
+  |> ???:8:36
+  |
+8 |     let stack = (stack as *mut u64).sub(count);
+  |                                    ^

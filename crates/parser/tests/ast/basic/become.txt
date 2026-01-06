@@ -1,7 +1,7 @@
 stencil foo(){
     become bar(1usize,"a")
 }
-----------
+/************
 [0]Module {
   definition: None,
   stmts: Some([

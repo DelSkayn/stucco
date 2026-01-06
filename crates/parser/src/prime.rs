@@ -1,5 +1,8 @@
 use crate::{Parse, ParseResult, Parser, util};
-use ::token::{T, token};
+use ::token::{
+    Spanned, T,
+    token::{self, LitBool},
+};
 
 pub fn parse_prime<'src>(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, ast::Expr> {
     if parser.peek::<T![if]>() {
@@ -32,6 +35,20 @@ pub fn parse_prime<'src>(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src,
     }
     if let Some(lit) = parser.eat::<token::Lit>() {
         let lit = parser.push(lit)?;
+        return Ok(ast::Expr::Literal(lit));
+    }
+    if let Some(lit) = parser.eat::<T![true]>() {
+        let lit = parser.push(ast::Lit::Bool(LitBool {
+            value: true,
+            span: lit.span(),
+        }))?;
+        return Ok(ast::Expr::Literal(lit));
+    }
+    if let Some(lit) = parser.eat::<T![false]>() {
+        let lit = parser.push(ast::Lit::Bool(LitBool {
+            value: false,
+            span: lit.span(),
+        }))?;
         return Ok(ast::Expr::Literal(lit));
     }
     if parser.peek::<token::Paren>() {
@@ -114,13 +131,14 @@ impl<'src> Parse<'src> for ast::Let {
 
         let mutable = parser.eat::<T![mut]>().is_some();
 
+        let sym = parser.parse_push()?;
+
         let ty = if let Some(_) = parser.eat::<T![:]>() {
             Some(parser.parse_push()?)
         } else {
             None
         };
 
-        let sym = parser.parse_push()?;
         parser.expect::<T![=]>()?;
         let expr = parser.parse_push()?;
 

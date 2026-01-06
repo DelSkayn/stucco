@@ -3,7 +3,7 @@ fn foo(){
 
 fn foo(){
 }
-----------
+/************
 RESOLVE ERROR: Error: Cannot redeclare symbol `foo`
   |> ???:4:4
   |

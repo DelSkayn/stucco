@@ -8,7 +8,7 @@ use std::{
     str::FromStr,
 };
 use token::{
-    Peek, Span, T, Token, TokenBuffer, TokenSlice, TokenType,
+    Peek, Span, Token, TokenBuffer, TokenSlice, TokenType,
     token::{DelimSpan, Delimiter},
 };
 
