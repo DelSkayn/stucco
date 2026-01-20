@@ -1,0 +1,16 @@
+mod t();
+
+fn t(){
+    if true {
+        1
+    }else{
+        false
+    };
+}
+/************
+TYPE ERROR: Error: Cannot coerce type `bool` to `u64`
+  |> ???:7:9
+  |
+7 |         false
+  |         ^^^^^
+*/

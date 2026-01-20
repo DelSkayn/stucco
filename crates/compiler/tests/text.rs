@@ -1,10 +1,6 @@
 #![cfg(feature = "dev")]
 
-use ast::visit::Visit;
-use common::{
-    render::IndentFormatter,
-    test::{current_file_path, string_test_runner},
-};
+use common::test::{current_file_path, string_test_runner};
 use parser::{Parser, parse_external_module};
 
 use stucco_compiler::{

@@ -1,0 +1,5 @@
+
+impl <T> *mut T {
+    fn foo(this: Self, t: T){
+    }
+}

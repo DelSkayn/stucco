@@ -1,0 +1,55 @@
+fn t<T>(a: T, b: T) -> i32 {
+    a + b
+}
+/************
+[0]Module {
+  definition: None,
+  stmts: Some([
+    [0]Stmt::Function([0]Function {
+      sym: [0]Symbol {
+        name: [0]Ident{ sym: t, span: 3..4 },
+      },
+      templates: Some([
+        [0]TypeName {
+          name: [1]Ident{ sym: T, span: 5..6 },
+        },
+      ]),
+      parameters: Some([
+        [0]Parameter {
+          sym: [1]Symbol {
+            name: [2]Ident{ sym: a, span: 8..9 },
+          },
+          ty: [0]Type::Name([1]TypeName {
+            name: [1]Ident{ sym: T, span: 5..6 },
+          }),
+        },
+        [1]Parameter {
+          sym: [2]Symbol {
+            name: [3]Ident{ sym: b, span: 14..15 },
+          },
+          ty: [1]Type::Name([2]TypeName {
+            name: [1]Ident{ sym: T, span: 5..6 },
+          }),
+        },
+      ]),
+      output: Some([2]Type::Name([3]TypeName {
+        name: [4]Ident{ sym: i32, span: 23..26 },
+      })),
+      body: [3]Expr::Block([0]Block {
+        body: Some([
+          [2]Expr::Binary([0]BinaryExpr {
+            left: [1]Expr::Symbol([3]Symbol {
+              name: [2]Ident{ sym: a, span: 8..9 },
+            }),
+            op: Add,
+            right: [0]Expr::Symbol([4]Symbol {
+              name: [3]Ident{ sym: b, span: 14..15 },
+            }),
+          }),
+        ]),
+        returns_last: true,
+      }),
+    }),
+  ]),
+}
+*/

@@ -122,6 +122,24 @@ impl<'src> Parse<'src> for ast::Struct {
 
         let name = parser.parse_push()?;
 
+        let mut templates = None;
+        if parser.eat::<T![<]>().is_some() {
+            let mut current = None;
+            loop {
+                if parser.eat::<T![>]>().is_some() {
+                    break;
+                }
+
+                let v = parser.parse_push::<ast::TypeName>()?;
+                parser.push_list(&mut templates, &mut current, v)?;
+
+                if parser.eat::<T![,]>().is_none() {
+                    parser.expect::<T![>]>()?;
+                    break;
+                }
+            }
+        }
+
         let fields =
             parser.parse_braced(|parser, _| parser.parse_terminated::<ast::Field, T![,]>())?;
 
@@ -130,6 +148,7 @@ impl<'src> Parse<'src> for ast::Struct {
         Ok(ast::Struct {
             public,
             name,
+            templates,
             fields,
             span,
         })

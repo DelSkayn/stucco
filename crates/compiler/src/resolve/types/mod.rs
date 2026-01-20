@@ -15,6 +15,32 @@ id!(TypeTupleId);
 id!(TypeFieldId);
 id!(TypeDeclId);
 
+id!(TypePatId);
+id!(TypePatTupleId);
+id!(TypePatFieldId);
+id!(GenericId);
+
+/// Type Pattern, i.e. a non-concrate type like `\T.*mut T`
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+pub enum TypePat {
+    Struct {
+        decl: TypeDeclId,
+        fields: Option<TypePatFieldId>,
+    },
+    Ptr {
+        to: TypePatId,
+    },
+    PtrMut {
+        to: TypePatId,
+    },
+    Fn {
+        args: Option<TypePatTupleId>,
+        output: TypePatId,
+    },
+    Concrete(TypeId),
+    Generic(GenericId),
+}
+
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Type {
     Struct {
@@ -47,22 +73,29 @@ pub enum Type {
     Ignore,
 }
 
-pub struct TypeDecl {
-    ty: TypeId,
-    declare: Option<NodeId<ast::TypeName>>,
+pub enum TypeDecl {
+    Builtin(TypeId),
+    Generic {
+        id: GenericId,
+        declared: NodeId<ast::TypeName>,
+    },
+    Defined {
+        ty: TypePat,
+        declared: NodeId<ast::TypeName>,
+    },
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct TypeTupleEntry {
-    ty: TypeId,
-    next: Option<TypeTupleId>,
+    pub ty: TypeId,
+    pub next: Option<TypeTupleId>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub struct TypeFieldEntry {
-    name: NodeId<Ident>,
-    ty: TypeId,
-    next: Option<TypeFieldId>,
+    pub name: NodeId<Ident>,
+    pub ty: TypeId,
+    pub next: Option<TypeFieldId>,
 }
 
 pub struct TypeTable {
@@ -124,9 +157,7 @@ impl TypeTable {
 
     fn insert_predefined(&mut self, name: &str, ty: Type) -> TypeId {
         let ty = self.types.push_expect(ty);
-        let decl = self
-            .declarations
-            .push_expect(TypeDecl { ty, declare: None });
+        let decl = self.declarations.push_expect(TypeDecl::Builtin(ty));
         self.predefined
             .insert(Ident::new(name, Span::call_site().into()), decl);
         ty
@@ -155,10 +186,10 @@ impl TypeTable {
 
         match self.types[ty] {
             Type::Struct { decl, .. } => {
-                if let Some(x) = self.declarations[decl].declare {
-                    let _ = write!(res, "{}", x.index(ast).name.index(ast));
+                if let TypeDecl::Defined { declared, .. } = self.declarations[decl] {
+                    let _ = write!(res, "{}", declared.index(ast).name.index(ast));
                 } else {
-                    todo!()
+                    panic!("all struct should have been defined")
                 }
             }
             Type::Ptr { to } => {
@@ -196,10 +227,10 @@ impl TypeTable {
                 }
             }
             Type::Decl { decl } => {
-                if let Some(x) = self.declarations[decl].declare {
-                    let _ = write!(res, "{}", x.index(ast).name.index(ast));
+                if let TypeDecl::Defined { declared, .. } = self.declarations[decl] {
+                    let _ = write!(res, "{}", declared.index(ast).name.index(ast));
                 } else {
-                    todo!()
+                    panic!("all struct should have been defined")
                 }
             }
             Type::Ignore => {

@@ -52,6 +52,7 @@ impl<'src, 't> SymbolResolvePass<'src, 't> {
                         this.declare_symbol(ast, ast[n].sym, SymbolKind::Function)?;
                     }
                     ast::Stmt::Definition(_) => continue,
+                    ast::Stmt::Impl(_) => continue,
                 }
             }
 

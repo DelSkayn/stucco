@@ -1,8 +1,9 @@
 use crate::{
-    Become, BinaryExpr, Block, Break, Call, Cast, Expr, Field, FieldExpr, Function, If, Index, Let,
-    Loop, Method, Module, ModuleDefinition, NodeId, NodeListId, Parameter, Return, Span, Stencil,
-    Stmt, Struct, Symbol, Type, TypeArray, TypeFn, TypeName, TypePtr, TypeReference, TypeTuple,
-    UnaryExpr, Variant, Variation, VariationConst, VariationImmediate, VariationSlot, While,
+    Become, BinaryExpr, Block, Break, Call, Cast, Expr, Field, FieldExpr, Function, If, Impl,
+    Index, Let, Loop, Method, Module, ModuleDefinition, NodeId, NodeListId, Parameter, Return,
+    Span, Stencil, Stmt, Struct, Symbol, Type, TypeArray, TypeFn, TypeName, TypePtr, TypeReference,
+    TypeTuple, UnaryExpr, Variant, Variation, VariationConst, VariationImmediate, VariationSlot,
+    While,
 };
 use token::token::{Ident, Lit};
 
@@ -67,7 +68,21 @@ implement_visitor! {
             Stmt::Struct(s) => visit.visit_struct(ast, s),
             Stmt::Function(f) => visit.visit_function(ast,f),
             Stmt::Definition(f) => visit.visit_module_definition(ast,f),
+            Stmt::Impl(f) => visit.visit_impl(ast,f),
         }
+    }
+
+    fn visit_impl(visit, ast, m: NodeId<Impl>) {
+        for n in ast.iter_list_node(ast[m].generic){
+            visit.visit_type_name(ast, n)?;
+        }
+
+        visit.visit_type(ast,ast[m].ty)?;
+
+        for n in ast.iter_list_node(ast[m].functions){
+            visit.visit_function(ast, n)?;
+        }
+        Ok(())
     }
 
     fn visit_function(visit, ast, m: NodeId<Function>) {

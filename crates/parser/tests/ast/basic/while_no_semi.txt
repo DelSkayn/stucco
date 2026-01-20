@@ -18,9 +18,7 @@ stencil foo(){
       body: [6]Expr::Block([1]Block {
         body: Some([
           [2]Expr::While([0]While {
-            condition: [0]Expr::Symbol([1]Symbol {
-              name: [1]Ident{ sym: false, span: 25..30 },
-            }),
+            condition: [0]Expr::Literal([0]Bool(LitBool { value: false, span: Span(25..30) })),
             then: [0]Block {
               body: Some([
                 [1]Expr::Break([0]Break {
@@ -31,9 +29,9 @@ stencil foo(){
             },
           }),
           [5]Expr::Binary([0]BinaryExpr {
-            left: [4]Expr::Literal([0]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(57..58) })),
+            left: [4]Expr::Literal([1]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(57..58) })),
             op: Add,
-            right: [3]Expr::Literal([1]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(61..62) })),
+            right: [3]Expr::Literal([2]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(61..62) })),
           }),
         ]),
         returns_last: true,
@@ -41,3 +39,4 @@ stencil foo(){
     }),
   ]),
 }
+*/

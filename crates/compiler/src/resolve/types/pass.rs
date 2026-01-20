@@ -1,14 +1,17 @@
+use std::collections::HashMap;
+
 use ast::{Ast, NodeId, visit::Visit};
 use error::{AnnotationKind, Diagnostic, Level, Snippet};
-use token::Span;
+use token::{Span, token::Ident};
 
 use crate::resolve::types::{
-    Type, TypeDecl, TypeDeclId, TypeFieldEntry, TypeId, TypeTable, TypeTupleEntry,
+    GenericId, Type, TypeDecl, TypeDeclId, TypeFieldEntry, TypeId, TypeTable, TypeTupleEntry,
 };
 
 pub struct TypeResolvePass<'src, 't> {
     src: &'src str,
     table: &'t mut TypeTable,
+    pending_generics: HashMap<NodeId<Ident>, GenericId>,
 }
 
 impl<'src, 't> TypeResolvePass<'src, 't> {
@@ -17,7 +20,11 @@ impl<'src, 't> TypeResolvePass<'src, 't> {
             table.definition.is_none(),
             "Type table already used in a resolve pass"
         );
-        TypeResolvePass { src, table }
+        TypeResolvePass {
+            src,
+            table,
+            pending_generics: HashMap::new(),
+        }
     }
 
     pub fn declare_type(
@@ -70,7 +77,10 @@ impl<'src, 't> TypeResolvePass<'src, 't> {
     pub fn pass(mut self, ast: &Ast, root: NodeId<ast::Module>) -> Result<(), Diagnostic<'src>> {
         for stmt in ast.iter_list_node(ast[root].stmts) {
             match ast[stmt] {
-                ast::Stmt::Stencil(_) | ast::Stmt::Function(_) | ast::Stmt::Definition(_) => {}
+                ast::Stmt::Stencil(_)
+                | ast::Stmt::Function(_)
+                | ast::Stmt::Definition(_)
+                | ast::Stmt::Impl(_) => {}
                 ast::Stmt::Struct(n) => self.declare_type(ast, ast[n].name)?,
             }
         }

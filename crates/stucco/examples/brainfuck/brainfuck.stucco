@@ -1,23 +1,38 @@
 // This is a stucco file, this describes stencils and their variants which,
 // after compilation, can be used to jit-compile a function.
 
+// Every stucco file needs a module declaration.
+// This declaration describes the type of function we will be constructing with the stencils.
+// In this our function just takes a pointer for the stack
+mod bf(*mut usize);
+
+
 // This is a stencil for the next operation in brainfuck, `>`.
 // We don't actually emit a next for every `>` but combine multiple `>` into a single 
 // variant by setting the `count` immediate to the number to shift the stack by.
 stencil next(stack: usize, count: usize)
+
+    // Each stencil needs atleast a single variant to be usefull
+    //
     // A variant is a single version of a stencil.
-    // Each stencil can have multiple variants which can have different variations of inputs.
-    // In the below variant the `count` input is an immediate which means it will be backed in 
-    // when compiling the jit function.
-    // `stack` is a slot which means it will b read from the from the stack.
+    // Each stencil can have multiple variants which can have different variations the arguments to the stencil.
+    //
+    // In the below variant the `count` input is an immediate which means it will be baked in to assembly
+    // when the variant is used.
+    // the `stack` vriant is a slot which means it will read read from the from the stucco 'stack'.
+    // 
+    // Stucco jit compiled functions all work on a fixed size stack, each slot of that stack can be used to retrieve 
+    // and store values in. Some stack slots can be backed by registers, the final compilation output will have information
+    // about what is stored where and what registers can be used.
+
     variant base:
         imm count,
         slot stack,
 {
     let stack = (stack as *mut usize).add(count);
 
-    // A become marks the place where a variant can jump to the next variant.
-    // In this mark the `next` jump and hand it the `stack` variable.
+    // A `become` statement marks the place where a variant can jump to the next variant.
+    // The become below will the `next` jump and hand it the `stack` variable.
     // This `stack` variable will be pushed on the stencil stack which can then be read by the next function.
     become next(stack as usize);
 }
@@ -99,7 +114,11 @@ stencil halt(stack: usize)
     variant base:
         slot stack
 {
-    // a `return` statement will not return from the variant but actually from the entire jit-compiled function. 
+    // a `return` statement in a stencil will not return from the variant but actually 
+    // from the entire jit-compiled function. 
+    //
+    // Therefore the type of the value returned must be the same as defined in the module definition.
+    // `nil` in this case.
     return;
 }
 

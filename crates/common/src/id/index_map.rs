@@ -143,7 +143,10 @@ impl<I: Id, T> IndexMap<I, Option<T>> {
     #[inline]
     #[track_caller]
     pub fn get_filled(&self, i: I) -> &T {
-        self[i].as_ref().unwrap()
+        let Some(x) = self[i].as_ref() else {
+            panic!("found empty value at index which had to be present")
+        };
+        x
     }
 
     /// Returns the entry for the given index assuming it is filled.
@@ -151,7 +154,10 @@ impl<I: Id, T> IndexMap<I, Option<T>> {
     #[inline]
     #[track_caller]
     pub fn get_filled_mut(&mut self, i: I) -> &mut T {
-        self[i].as_mut().unwrap()
+        let Some(x) = self[i].as_mut() else {
+            panic!("found empty value at index which had to be present")
+        };
+        x
     }
 
     /// Returns the entry for the given index.

@@ -78,6 +78,7 @@ library!(Library {
 
     symbol: U32Vec<Symbol>,
     type_name: U32Vec<TypeName>,
+    type_names: U32Vec<NodeList<TypeName>>,
 
     #[set]
     ident: LibrarySet<Ident>,
@@ -348,6 +349,15 @@ ast_enum! {
         Struct(NodeId<Struct>),
         Function(NodeId<Function>),
         Definition(NodeId<ModuleDefinition>),
+        Impl(NodeId<Impl>)
+    }
+}
+
+ast_struct! {
+    pub struct Impl{
+        pub generic: Option<NodeListId<TypeName>>,
+        pub ty: NodeId<Type>,
+        pub functions: Option<NodeListId<Function>>,
     }
 }
 
@@ -355,6 +365,7 @@ ast_struct! {
     pub struct Struct{
         pub public: bool,
         pub name: NodeId<TypeName>,
+        pub templates: Option<NodeListId<TypeName>>,
         pub fields: Option<NodeListId<Field>>,
     }
 }
@@ -362,6 +373,7 @@ ast_struct! {
 ast_struct! {
     pub struct Function{
         pub sym: NodeId<Symbol>,
+        pub templates: Option<NodeListId<TypeName>>,
         pub parameters: Option<NodeListId<Parameter>>,
         pub output: Option<NodeId<Type>>,
         /// Guaranteed to be Expr::Block

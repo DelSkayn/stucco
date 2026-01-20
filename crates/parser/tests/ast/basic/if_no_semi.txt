@@ -20,26 +20,24 @@ stencil foo(){
       body: [7]Expr::Block([2]Block {
         body: Some([
           [3]Expr::If([0]If {
-            condition: [0]Expr::Symbol([1]Symbol {
-              name: [1]Ident{ sym: true, span: 22..26 },
-            }),
+            condition: [0]Expr::Literal([0]Bool(LitBool { value: true, span: Span(22..26) })),
             then: [0]Block {
               body: Some([
-                [1]Expr::Literal([0]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(37..38) })),
+                [1]Expr::Literal([1]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(37..38) })),
               ]),
               returns_last: true,
             },
             otherwise: Some([1]Block {
               body: Some([
-                [2]Expr::Literal([1]Int(LitInt { value: Unsigned(2), suffix: None, span: Span(58..59) })),
+                [2]Expr::Literal([2]Int(LitInt { value: Unsigned(2), suffix: None, span: Span(58..59) })),
               ]),
               returns_last: true,
             }),
           }),
           [6]Expr::Binary([0]BinaryExpr {
-            left: [5]Expr::Literal([2]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(70..71) })),
+            left: [5]Expr::Literal([3]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(70..71) })),
             op: Add,
-            right: [4]Expr::Literal([3]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(74..75) })),
+            right: [4]Expr::Literal([4]Int(LitInt { value: Unsigned(1), suffix: None, span: Span(74..75) })),
           }),
         ]),
         returns_last: true,
@@ -47,3 +45,4 @@ stencil foo(){
     }),
   ]),
 }
+*/

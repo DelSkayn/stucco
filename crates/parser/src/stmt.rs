@@ -1,5 +1,5 @@
 use ast::AstSpanned;
-use token::T;
+use token::{Span, T};
 
 use crate::{Parse, ParseResult, Parser};
 
@@ -18,6 +18,11 @@ impl<'src> Parse<'src> for ast::Stmt {
         if parser.peek::<T![struct]>() {
             let s = parser.parse_push()?;
             return Ok(ast::Stmt::Struct(s));
+        }
+
+        if parser.peek::<T![impl]>() {
+            let s = parser.parse_push()?;
+            return Ok(ast::Stmt::Impl(s));
         }
 
         if parser.peek::<T![mod]>() {
@@ -92,6 +97,44 @@ impl<'src> Parse<'src> for ast::ModuleDefinition {
             name: sym,
             ty,
             span,
+        })
+    }
+}
+
+impl<'src> Parse<'src> for ast::Impl {
+    fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
+        let span = parser.expect::<T![impl]>()?.0;
+
+        let mut generic = None;
+        if parser.peek::<T![<]>() {
+            parser.expect::<T![<]>()?;
+
+            let mut tail = None;
+            while !parser.peek::<T![>]>() {
+                let name = parser.parse_push()?;
+                parser.push_list(&mut generic, &mut tail, name)?;
+            }
+
+            parser.expect::<T![>]>()?;
+        }
+
+        let ty = parser.parse_push()?;
+
+        let mut functions = None;
+        let last_span = parser.parse_braced(|parser, span| {
+            let mut tail = None;
+            while !parser.is_empty() {
+                let func = parser.parse_push()?;
+                parser.push_list(&mut functions, &mut tail, func)?;
+            }
+            Ok(span)
+        })?;
+
+        Ok(ast::Impl {
+            generic,
+            ty,
+            functions,
+            span: span.try_join(last_span),
         })
     }
 }

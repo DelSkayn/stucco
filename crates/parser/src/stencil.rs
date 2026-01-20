@@ -1,5 +1,6 @@
 use ast::Variant;
-use token::T;
+use error::{AnnotationKind, Level, Snippet};
+use token::{Spanned, T};
 
 use crate::{Parse, ParseResult, Parser};
 
@@ -7,6 +8,21 @@ impl<'src> Parse<'src> for ast::Stencil {
     fn parse(parser: &mut Parser<'src, '_, '_>) -> ParseResult<'src, Self> {
         let span = parser.expect::<T![stencil]>()?.0;
         let sym = parser.parse_push()?;
+
+        if let Some(x) = parser.eat::<T![<]>() {
+            return Err(parser.with_error(|p| {
+                Level::Error
+                    .title("Unexpected token `<`, expected `(`")
+                    .snippet(
+                        Snippet::source(p.source).annotate(
+                            AnnotationKind::Primary
+                                .span(x.span())
+                                .label("Stencils cannot have templates"),
+                        ),
+                    )
+                    .to_diagnostic()
+            }));
+        }
 
         let parameters =
             parser.parse_parenthesized(|parser, _| parser.parse_terminated::<_, T![,]>())?;
@@ -45,6 +61,24 @@ impl<'src> Parse<'src> for ast::Function {
         let span = parser.expect::<T![fn]>()?.0;
         let sym = parser.parse_push()?;
 
+        let mut templates = None;
+        if parser.eat::<T![<]>().is_some() {
+            let mut current = None;
+            loop {
+                if parser.eat::<T![>]>().is_some() {
+                    break;
+                }
+
+                let v = parser.parse_push::<ast::TypeName>()?;
+                parser.push_list(&mut templates, &mut current, v)?;
+
+                if parser.eat::<T![,]>().is_none() {
+                    parser.expect::<T![>]>()?;
+                    break;
+                }
+            }
+        }
+
         let parameters =
             parser.parse_parenthesized(|parser, _| parser.parse_terminated::<_, T![,]>())?;
 
@@ -60,6 +94,7 @@ impl<'src> Parse<'src> for ast::Function {
 
         Ok(ast::Function {
             sym,
+            templates,
             parameters,
             span,
             output,

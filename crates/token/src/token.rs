@@ -105,6 +105,7 @@ impl_keywords! {
     fn => Fn,
     if => If,
     imm => Imm,
+    impl => Impl,
     loop => Loop,
     let => Let,
     mut => Mut,

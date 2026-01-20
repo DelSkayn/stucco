@@ -13,6 +13,7 @@ struct Data{
       name: [0]TypeName {
         name: [0]Ident{ sym: Data, span: 7..11 },
       },
+      templates: None,
       fields: Some([
         [0]Field {
           name: [1]Ident{ sym: number, span: 17..23 },
@@ -45,3 +46,4 @@ struct Data{
     }),
   ]),
 }
+*/

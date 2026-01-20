@@ -1,0 +1,29 @@
+struct Data<T>{
+    data: T,
+}
+/************
+[0]Module {
+  definition: None,
+  stmts: Some([
+    [0]Stmt::Struct([0]Struct {
+      public: false,
+      name: [0]TypeName {
+        name: [0]Ident{ sym: Data, span: 7..11 },
+      },
+      templates: Some([
+        [1]TypeName {
+          name: [1]Ident{ sym: T, span: 12..13 },
+        },
+      ]),
+      fields: Some([
+        [0]Field {
+          name: [2]Ident{ sym: data, span: 20..24 },
+          ty: [0]Type::Name([2]TypeName {
+            name: [1]Ident{ sym: T, span: 12..13 },
+          }),
+        },
+      ]),
+    }),
+  ]),
+}
+*/

@@ -13,6 +13,7 @@ fn mul(a: i32, b: i32) -> i32 {
       sym: [0]Symbol {
         name: [0]Ident{ sym: add, span: 3..6 },
       },
+      templates: None,
       parameters: Some([
         [0]Parameter {
           sym: [1]Symbol {
@@ -53,6 +54,7 @@ fn mul(a: i32, b: i32) -> i32 {
       sym: [5]Symbol {
         name: [4]Ident{ sym: mul, span: 48..51 },
       },
+      templates: None,
       parameters: Some([
         [2]Parameter {
           sym: [6]Symbol {
@@ -91,3 +93,4 @@ fn mul(a: i32, b: i32) -> i32 {
     }),
   ]),
 }
+*/

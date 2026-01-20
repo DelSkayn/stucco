@@ -210,13 +210,11 @@ impl<'src> Parse<'src> for ast::Block {
 
                 returns_last = true;
 
-                if util::expr_needs_semicolon(parser, expr) {
-                    if !parser.is_empty() {
-                        parser.expect::<T![;]>()?;
-                    }
-                } else {
-                    returns_last = parser.eat::<T![;]>().is_some();
+                if !parser.is_empty() && util::expr_needs_semicolon(parser, expr) {
+                    parser.expect::<T![;]>()?;
+                    continue;
                 }
+                returns_last = !parser.eat::<T![;]>().is_some();
             }
             Ok(head)
         })?;
