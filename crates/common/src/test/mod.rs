@@ -84,6 +84,14 @@ pub fn string_test_runner<F: Fn(&str) -> String>(path: &Path, f: F) {
             println!("{}", expect);
             println!("# Got:");
             println!("{}", res);
+            println!("# Diff:");
+            for c in dissimilar::diff(expect, res) {
+                match c {
+                    dissimilar::Chunk::Equal(s) => print!("{s}"),
+                    dissimilar::Chunk::Delete(s) => print!("\x1b[31m{s}\x1b[m"),
+                    dissimilar::Chunk::Insert(s) => print!("\x1b[32m{s}\x1b[m"),
+                }
+            }
 
             if let TestResult::Overwrite = results {
                 std::fs::write(
@@ -117,6 +125,10 @@ pub fn string_test_runner<F: Fn(&str) -> String>(path: &Path, f: F) {
                 .unwrap();
             }
         }
+
+        println!();
+        println!();
+        println!();
     }
 
     if !successfull {

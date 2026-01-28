@@ -3,7 +3,7 @@ fn foo(){
 
 fn bar(){
     let foo = 1;
-    bar();
+    foo();
 }
 /************
 DECLARED:
@@ -25,6 +25,7 @@ USES:
         }
         function bar {
             [1] = bar @ 'fn %bar%(){'
-            [1] = bar @ '%bar%();'
+            [0] = foo @ '%foo%();'
         }
     }
+*/
