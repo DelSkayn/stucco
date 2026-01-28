@@ -1,0 +1,14 @@
+mod t();
+
+fn f<T,T>(){
+    let a: T = return;
+}
+/************
+RESOLVE ERROR: Error: Cannot redeclare type `T`
+  |> ???:3:8
+  |
+3 | fn f<T,T>(){
+  |        ^ 
+3 | fn f<T,T>(){
+  |      ^ Type first declared here
+*/

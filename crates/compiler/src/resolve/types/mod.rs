@@ -15,32 +15,9 @@ id!(TypeTupleId);
 id!(TypeFieldId);
 id!(TypeDeclId);
 
-id!(TypePatId);
-id!(TypePatTupleId);
-id!(TypePatFieldId);
 id!(GenericId);
 
-/// Type Pattern, i.e. a non-concrate type like `\T.*mut T`
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
-pub enum TypePat {
-    Struct {
-        decl: TypeDeclId,
-        fields: Option<TypePatFieldId>,
-    },
-    Ptr {
-        to: TypePatId,
-    },
-    PtrMut {
-        to: TypePatId,
-    },
-    Fn {
-        args: Option<TypePatTupleId>,
-        output: TypePatId,
-    },
-    Concrete(TypeId),
-    Generic(GenericId),
-}
-
+/// Actual type definition.
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Type {
     Struct {
@@ -65,6 +42,8 @@ pub enum Type {
         args: Option<TypeTupleId>,
         output: TypeId,
     },
+    /// Used for type names, refers to a declared type,
+    /// Not used for builtins.
     Decl {
         decl: TypeDeclId,
     },
@@ -73,15 +52,20 @@ pub enum Type {
     Ignore,
 }
 
+/// Data about a declared type.
 pub enum TypeDecl {
     Builtin(TypeId),
-    Generic {
+    Template {
         id: GenericId,
         declared: NodeId<ast::TypeName>,
+        /// Is this type shadowing another type.
+        shadowed: Option<TypeDeclId>,
     },
     Defined {
-        ty: TypePat,
+        ty: TypeId,
         declared: NodeId<ast::TypeName>,
+        /// Is this type shadowing another type.
+        shadowed: Option<TypeDeclId>,
     },
 }
 
@@ -103,19 +87,30 @@ pub struct TypeTable {
     pub type_tuples: IdSet<TypeTupleId, TypeTupleEntry>,
     pub type_fields: IdSet<TypeFieldId, TypeFieldEntry>,
 
+    /// Hashmap for looking up the type of fields of a struct
+    /// Key format is `TypeDeclId` of the struct + NodeId of the name of the field.
     pub field_name_to_type: HashMap<(TypeDeclId, NodeId<Ident>), TypeId>,
 
+    /// Types which are declared and not infered, builtin + struct + generic.
     pub declarations: IndexMap<TypeDeclId, TypeDecl>,
+
+    /// Maps from the ast to a type.
     pub ast_to_type: PartialIndexMap<NodeId<ast::Type>, TypeId>,
     pub ast_name_to_type: PartialIndexMap<NodeId<ast::TypeName>, TypeDeclId>,
     pub ast_fn_to_type: PartialIndexMap<NodeId<ast::Function>, TypeId>,
-    pub name_to_type: HashMap<NodeId<Ident>, TypeDeclId>,
+
+    /// Map for predefined names to a specific declared type.
     pub predefined: HashMap<Ident, TypeDeclId>,
+
+    /// Type for the stucco module definition, has to be some after initial type resolve pass.
     pub definition: Option<(NodeId<ast::ModuleDefinition>, TypeId)>,
 
     // Set in the type_check pass.
     pub expr_to_ty: PartialIndexMap<NodeId<ast::Expr>, TypeId>,
     pub symbol_to_ty: PartialIndexMap<SymbolId, TypeId>,
+
+    /// Map of the generics to a specific type, altered during a type pass.
+    pub generics: IndexMap<GenericId, Option<TypeId>>,
 }
 
 impl TypeId {
@@ -132,12 +127,15 @@ impl TypeTable {
             types: IdSet::new(),
             type_tuples: IdSet::new(),
             type_fields: IdSet::new(),
+
             field_name_to_type: HashMap::new(),
+
             declarations: IndexMap::new(),
+            generics: IndexMap::new(),
+
             ast_to_type: PartialIndexMap::new(),
             ast_name_to_type: PartialIndexMap::new(),
             ast_fn_to_type: PartialIndexMap::new(),
-            name_to_type: HashMap::new(),
             predefined: HashMap::new(),
             definition: None,
 
@@ -172,7 +170,12 @@ impl TypeTable {
             return true;
         }
 
-        from == to
+        self.is_equal(from, to)
+    }
+
+    pub fn is_equal(&self, a: TypeId, b: TypeId) -> bool {
+        // TODO: Incorrect with generics, fix
+        a == b
     }
 
     pub fn format_type(&self, ast: &Ast, ty: TypeId) -> String {
@@ -226,13 +229,12 @@ impl TypeTable {
                     self.format_type_inner(ast, output, res);
                 }
             }
-            Type::Decl { decl } => {
-                if let TypeDecl::Defined { declared, .. } = self.declarations[decl] {
+            Type::Decl { decl } => match self.declarations[decl] {
+                TypeDecl::Builtin(_) => panic!("A decl should not be a builtin"),
+                TypeDecl::Template { declared, .. } | TypeDecl::Defined { declared, .. } => {
                     let _ = write!(res, "{}", declared.index(ast).name.index(ast));
-                } else {
-                    panic!("all struct should have been defined")
                 }
-            }
+            },
             Type::Ignore => {
                 res.push_str("#IGNORE, NOT A REAL TYPE#");
             }

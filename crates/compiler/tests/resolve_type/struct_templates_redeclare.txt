@@ -1,0 +1,14 @@
+mod t();
+
+struct F<T,T>{
+    a: T,
+}
+/************
+RESOLVE ERROR: Error: Cannot redeclare type `T`
+  |> ???:3:12
+  |
+3 | struct F<T,T>{
+  |            ^ 
+3 | struct F<T,T>{
+  |          ^ Type first declared here
+*/
